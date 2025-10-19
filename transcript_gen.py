@@ -40,7 +40,32 @@ def format_output_parakeet(text):
     
     return summary
 
-def generate_transcript(audio, api_key, function_id, language_code, client_file):
+def format_output_whisper(text):
+    """
+    Format the transcription output text for better readability.
+    Converts continuous text into properly capitalized sentences.
+    
+    Args:
+        text: Raw transcription text from NVIDIA Riva
+    
+    Returns:
+        str: Formatted text with proper capitalization and punctuation
+    """
+    # Clean up the text
+    text = text.strip()
+    
+    # Capitalize the first letter if needed
+    if text:
+        text = text[0].upper() + text[1:]
+    
+    # Ensure it ends with a period if it doesn't have ending punctuation
+    if text and not text.endswith(('.', '!', '?')):
+        text = text + '.'
+    
+    return text
+
+
+def generate_transcript(audio, api_key, function_id, language_code, client_file, model):
     """
     Generate transcript using NVIDIA Riva ASR service.
     
@@ -78,16 +103,41 @@ def generate_transcript(audio, api_key, function_id, language_code, client_file)
             text=True,
             check=True
         )
+
+        if model == "openai/whisper-large-v3":
+            # Extract the final transcript from the output
+            output_lines = result.stdout.strip().split('\n')
+            final_transcript = None
+            
+            # Look for the line that starts with "Final transcript:"
+            for line in output_lines:
+                if line.startswith("Final transcript:"):
+                    final_transcript = line.replace("Final transcript:", "").strip()
+                    break
         
         # Display the transcription output
         st.subheader("Transcription")
-        st.text(format_output(result.stdout))
+        if (model == "nvidia/parakeet-ctc-1.1b-asr"):
+            st.text(format_output_parakeet(result.stdout))
+        
+        elif (model == "openai/whisper-large-v3"):
+            if final_transcript:
+                # Format and display the final transcript
+                formatted_transcript = format_output_whisper(final_transcript)
+                st.write(formatted_transcript)
+            else:
+                # If "Final transcript:" is not found, display the raw output
+                st.text(result.stdout)
         
         if result.stderr:
             st.warning("Warnings/Info:")
             st.text(result.stderr)
         
-        return result.stdout
+        if model == "openai/whisper-large-v3":
+            return final_transcript if final_transcript else result.stdout
+    
+        elif model == "nvidia/parakeet-ctc-1.1b-asr":
+            return result.stdout
             
     except subprocess.CalledProcessError as e:
         st.error(f"Error running transcription: {e}")

@@ -32,10 +32,10 @@ if st.button("Analyze Meeting"):
         st.success("Analyzing meeting...")
 
         if model == "openai/whisper-large-v3":
-            generate_transcript(audio, nvidia_api_key, "b702f636-f60c-4a3d-a6f4-f3568c13bd7d", "en", "transcribe_file_offline.py")
+            generate_transcript(audio, nvidia_api_key, "b702f636-f60c-4a3d-a6f4-f3568c13bd7d", "en", "transcribe_file_offline.py", "openai/whisper-large-v3")
         
         elif model == "nvidia/parakeet-ctc-1.1b-asr":
-            generate_transcript(audio, nvidia_api_key, "1598d209-5e27-4d3c-8079-4751568b1081", "en-US", "transcribe_file.py")
+            generate_transcript(audio, nvidia_api_key, "1598d209-5e27-4d3c-8079-4751568b1081", "en-US", "transcribe_file.py", "nvidia/parakeet-ctc-1.1b-asr")
 
     else:
         st.error("Please upload an audio file to analyze.")
