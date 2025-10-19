@@ -26,7 +26,7 @@ model = st.selectbox("Select the model for transcription", options=["nvidia/para
 
 if st.button("Analyze Meeting"):
     if audio:
-        with st.spinner("Analyzing meeting..."):
+        with st.spinner("Processing audio... This may take a few minutes."):
             # Generate transcript based on selected model
             if model == "openai/whisper-large-v3":
                 result = generate_transcript(
@@ -50,24 +50,38 @@ if st.button("Analyze Meeting"):
             
             # Display transcription results
             if result and result['success']:
+                st.success("✅ Transcription completed successfully!")
                 st.subheader("Transcription")
                 st.write(result['formatted_transcript'])
                 
                 if result['errors']:
-                    st.warning("Warnings/Info:")
-                    st.text(result['errors'])
+                    with st.expander("View Warnings/Debug Info"):
+                        st.text(result['errors'])
                 
                 # Generate summary
                 if result['transcript']:
-                    with st.spinner("Generating summary..."):
+                    with st.spinner("Generating AI summary..."):
                         summary = generate_summary(result['transcript'], openrouter_api_key)
                         
                         if summary:
                             st.subheader("Meeting Summary")
                             st.write(summary)
+                        else:
+                            st.warning("Could not generate summary. Please check your OpenRouter API key.")
             else:
-                st.error("Transcription failed")
+                st.error("❌ Transcription failed after multiple attempts")
                 if result and result['errors']:
+                    st.error("Error details:")
                     st.text(result['errors'])
+                    
+                    # Provide helpful suggestions
+                    if "DEADLINE_EXCEEDED" in result['errors'] or "failed to establish link" in result['errors']:
+                        st.info("""
+                        **Suggestions:**
+                        - The NVIDIA service might be experiencing high load. Try again in a few minutes.
+                        - Check your internet connection.
+                        - Try using the other transcription model.
+                        - For large audio files, try splitting them into smaller chunks.
+                        """)
     else:
         st.error("Please upload an audio file to analyze.")

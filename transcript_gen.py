@@ -78,7 +78,6 @@ def generate_transcript(audio, api_key, function_id, language_code, client_file,
     
     Returns:
         dict: Dictionary with 'transcript', 'formatted_transcript', and 'errors' keys
-              or None if critical error occurs
     """
     # Save the uploaded audio file temporarily
     temp_audio_path = "temp_audio.wav"
