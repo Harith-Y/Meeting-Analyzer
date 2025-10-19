@@ -32,10 +32,39 @@ if st.button("Analyze Meeting"):
         st.success("Analyzing meeting...")
 
         if model == "openai/whisper-large-v3":
-            generate_transcript(audio, nvidia_api_key, "b702f636-f60c-4a3d-a6f4-f3568c13bd7d", "en", "transcribe_file_offline.py", "openai/whisper-large-v3")
+            transcript = generate_transcript(audio, nvidia_api_key, "b702f636-f60c-4a3d-a6f4-f3568c13bd7d", "en", "transcribe_file_offline.py", "openai/whisper-large-v3")
         
         elif model == "nvidia/parakeet-ctc-1.1b-asr":
-            generate_transcript(audio, nvidia_api_key, "1598d209-5e27-4d3c-8079-4751568b1081", "en-US", "transcribe_file.py", "nvidia/parakeet-ctc-1.1b-asr")
+            transcript = generate_transcript(audio, nvidia_api_key, "1598d209-5e27-4d3c-8079-4751568b1081", "en-US", "transcribe_file.py", "nvidia/parakeet-ctc-1.1b-asr")
+
+        st.subheader("Meeting Summary")
+        
+        response = requests.post(
+        url="https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": "Bearer " + openrouter_api_key,
+            "Content-Type": "application/json",
+        },
+        data=json.dumps({
+            "model": "deepseek/deepseek-chat-v3.1:free",
+            "messages": [
+            {
+                "role": "user",
+                "content": "Summarize the following meeting transcript:\n\n" + transcript
+            }
+            ],
+            
+        })
+        )
+        
+        # Extract the summary from the JSON response
+        if response.status_code == 200:
+            response_data = response.json()
+            summary = response_data["choices"][0]["message"]["content"]
+            st.write(summary)
+        else:
+            st.error(f"Error getting summary: {response.status_code}")
+            st.text(response.text)
 
     else:
         st.error("Please upload an audio file to analyze.")
