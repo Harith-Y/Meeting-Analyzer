@@ -2,7 +2,7 @@ import streamlit as st
 import subprocess
 import os
 
-def format_output(text):
+def format_output_parakeet(text):
     """
     Format the transcription output text for better readability.
     Converts line-by-line actual-formatted-output (with ## markers) into a clean paragraph.
