@@ -1,5 +1,6 @@
 import subprocess
 import os
+from file_to_wav import convert_to_wav
 
 def format_output_parakeet(text):
     """
@@ -80,9 +81,44 @@ def generate_transcript(audio, api_key, function_id, language_code, client_file,
         dict: Dictionary with 'transcript', 'formatted_transcript', and 'errors' keys
     """
     # Save the uploaded audio file temporarily
-    temp_audio_path = "temp_audio.wav"
+    temp_audio_path = f"temp_audio{os.path.splitext(audio.name)[1]}"
     with open(temp_audio_path, "wb") as f:
         f.write(audio.getvalue())
+    
+    # Convert to WAV if necessary
+    wav_audio_path = temp_audio_path  # Default to original file
+    conversion_attempted = False
+    
+    try:
+        if not temp_audio_path.endswith('.wav'):
+            wav_audio_path = convert_to_wav(temp_audio_path)
+            conversion_attempted = True
+    except Exception as e:
+        # If conversion fails, provide helpful error message
+        import streamlit as st
+        error_msg = str(e)
+        
+        if "ffmpeg" in error_msg.lower() or "not found" in error_msg.lower():
+            st.error("❌ FFmpeg is not installed or not in PATH")
+            st.info("""
+            **To fix this:**
+            1. Close this Streamlit app
+            2. Restart your terminal/PowerShell (to load new PATH)
+            3. Verify FFmpeg: Run `ffmpeg -version`
+            4. Restart Streamlit: `streamlit run app.py`
+            
+            **Alternative:** Upload a WAV file instead of MP3/M4A
+            """)
+            return {
+                'transcript': None,
+                'formatted_transcript': None,
+                'errors': f"FFmpeg not found. Please install FFmpeg or use WAV files.",
+                'success': False
+            }
+        else:
+            st.warning(f"⚠️ Could not convert audio to WAV format: {error_msg}")
+            st.info("Attempting transcription with original format...")
+            wav_audio_path = temp_audio_path
     
     try:
         # Get the Python executable from the current environment
@@ -99,7 +135,7 @@ def generate_transcript(audio, api_key, function_id, language_code, client_file,
                 "--metadata", "function-id", f"{function_id}",
                 "--metadata", "authorization", f"Bearer {api_key}",
                 "--language-code", f"{language_code}",
-                "--input-file", temp_audio_path
+                "--input-file", wav_audio_path
             ],
             capture_output=True,
             text=True,
@@ -151,9 +187,12 @@ def generate_transcript(audio, api_key, function_id, language_code, client_file,
             'success': False
         }
     finally:
-        # Clean up the temporary file
+        # Clean up temporary files
         if os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)
+        # If a WAV conversion was created, clean it up too
+        if 'wav_audio_path' in locals() and wav_audio_path != temp_audio_path and os.path.exists(wav_audio_path):
+            os.remove(wav_audio_path)
 
 
 if __name__ == "__main__":

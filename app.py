@@ -21,6 +21,14 @@ else:
 audio = st.file_uploader("Upload your meeting audio file", type=["mp3", "wav", "m4a"])
 if audio:
     st.audio(audio, format="audio/wav")
+    
+    # Show file info
+    file_extension = audio.name.split('.')[-1].lower()
+    file_size_mb = audio.size / (1024 * 1024)
+    st.caption(f"📁 File: {audio.name} ({file_size_mb:.2f} MB)")
+    
+    if file_extension != 'wav':
+        st.info(f"ℹ️ Audio will be automatically converted from .{file_extension} to .wav format before transcription.")
 
 model = st.selectbox("Select the model for transcription", options=["nvidia/parakeet-ctc-1.1b-asr", "openai/whisper-large-v3"])
 
@@ -69,7 +77,7 @@ if st.button("Analyze Meeting"):
                         else:
                             st.warning("Could not generate summary. Please check your OpenRouter API key.")
             else:
-                st.error("❌ Transcription failed after multiple attempts")
+                st.error("❌ Transcription failed")
                 if result and result['errors']:
                     st.error("Error details:")
                     st.text(result['errors'])
