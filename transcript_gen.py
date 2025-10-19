@@ -1,4 +1,3 @@
-import streamlit as st
 import subprocess
 import os
 
@@ -73,9 +72,13 @@ def generate_transcript(audio, api_key, function_id, language_code, client_file,
         audio: Streamlit UploadedFile object
         api_key: NVIDIA API key
         function_id: NVIDIA function ID for the model
+        language_code: Language code for transcription
+        client_file: Name of the transcription script file
+        model: Model identifier string
     
     Returns:
-        str: Transcription text or None if error occurs
+        dict: Dictionary with 'transcript', 'formatted_transcript', and 'errors' keys
+              or None if critical error occurs
     """
     # Save the uploaded audio file temporarily
     temp_audio_path = "temp_audio.wav"
@@ -104,48 +107,50 @@ def generate_transcript(audio, api_key, function_id, language_code, client_file,
             check=True
         )
 
+        transcript = None
+        formatted_transcript = None
+        
         if model == "openai/whisper-large-v3":
             # Extract the final transcript from the output
             output_lines = result.stdout.strip().split('\n')
-            final_transcript = None
             
             # Look for the line that starts with "Final transcript:"
             for line in output_lines:
                 if line.startswith("Final transcript:"):
-                    final_transcript = line.replace("Final transcript:", "").strip()
+                    transcript = line.replace("Final transcript:", "").strip()
                     break
-        
-        # Display the transcription output
-        st.subheader("Transcription")
-        if (model == "nvidia/parakeet-ctc-1.1b-asr"):
-            st.text(format_output_parakeet(result.stdout))
-        
-        elif (model == "openai/whisper-large-v3"):
-            if final_transcript:
-                # Format and display the final transcript
-                formatted_transcript = format_output_whisper(final_transcript)
-                st.write(formatted_transcript)
+            
+            if transcript:
+                formatted_transcript = format_output_whisper(transcript)
             else:
-                # If "Final transcript:" is not found, display the raw output
-                st.text(result.stdout)
+                transcript = result.stdout
+                formatted_transcript = transcript
         
-        if result.stderr:
-            st.warning("Warnings/Info:")
-            st.text(result.stderr)
-        
-        if model == "openai/whisper-large-v3":
-            return final_transcript if final_transcript else result.stdout
-    
         elif model == "nvidia/parakeet-ctc-1.1b-asr":
-            return result.stdout
+            transcript = result.stdout
+            formatted_transcript = format_output_parakeet(transcript)
+        
+        return {
+            'transcript': transcript,
+            'formatted_transcript': formatted_transcript,
+            'errors': result.stderr if result.stderr else None,
+            'success': True
+        }
             
     except subprocess.CalledProcessError as e:
-        st.error(f"Error running transcription: {e}")
-        st.text(f"Error output: {e.stderr}")
-        return None
+        return {
+            'transcript': None,
+            'formatted_transcript': None,
+            'errors': f"Error running transcription: {e}\nError output: {e.stderr}",
+            'success': False
+        }
     except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-        return None
+        return {
+            'transcript': None,
+            'formatted_transcript': None,
+            'errors': f"An error occurred: {str(e)}",
+            'success': False
+        }
     finally:
         # Clean up the temporary file
         if os.path.exists(temp_audio_path):
