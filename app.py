@@ -9,6 +9,7 @@ import dotenv
 dotenv.load_dotenv()
 
 from transcript_gen import generate_transcript
+from summary_gen import generate_summary
 
 st.title("Meeting Analyzer")
 st.write("Welcome to the Meeting Analyzer app!")
@@ -37,34 +38,7 @@ if st.button("Analyze Meeting"):
         elif model == "nvidia/parakeet-ctc-1.1b-asr":
             transcript = generate_transcript(audio, nvidia_api_key, "1598d209-5e27-4d3c-8079-4751568b1081", "en-US", "transcribe_file.py", "nvidia/parakeet-ctc-1.1b-asr")
 
-        st.subheader("Meeting Summary")
-        
-        response = requests.post(
-        url="https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": "Bearer " + openrouter_api_key,
-            "Content-Type": "application/json",
-        },
-        data=json.dumps({
-            "model": "deepseek/deepseek-chat-v3.1:free",
-            "messages": [
-            {
-                "role": "user",
-                "content": "Summarize the following meeting transcript:\n\n" + transcript
-            }
-            ],
-            
-        })
-        )
-        
-        # Extract the summary from the JSON response
-        if response.status_code == 200:
-            response_data = response.json()
-            summary = response_data["choices"][0]["message"]["content"]
-            st.write(summary)
-        else:
-            st.error(f"Error getting summary: {response.status_code}")
-            st.text(response.text)
+        generate_summary(transcript, openrouter_api_key)
 
     else:
         st.error("Please upload an audio file to analyze.")
