@@ -45,25 +45,30 @@ TRANSCRIPTION_MODELS = {
 
 # Summary Models Configuration
 SUMMARY_MODELS = {
-    "google/gemini-2.0-flash-exp:free": {
-        "name": "Google Gemini 2.0 Flash (Free)",
-        "max_tokens": 8192,
-        "description": "Free, fast, high-quality summarization"
-    },
     "meta-llama/llama-3.1-8b-instruct:free": {
         "name": "Llama 3.1 8B (Free)",
         "max_tokens": 4096,
-        "description": "Free, efficient summarization"
+        "description": "Free, reliable summarization (Recommended)"
+    },
+    "google/gemini-2.0-flash-exp:free": {
+        "name": "Google Gemini 2.0 Flash (Free)",
+        "max_tokens": 8192,
+        "description": "Free, fast (may be rate-limited)"
+    },
+    "nousresearch/hermes-3-llama-3.1-405b:free": {
+        "name": "Hermes 3 Llama 405B (Free)",
+        "max_tokens": 4096,
+        "description": "Free, very capable model"
     },
     "meta-llama/llama-3.3-70b-instruct": {
-        "name": "Llama 3.3 70B",
+        "name": "Llama 3.3 70B (Paid)",
         "max_tokens": 8192,
-        "description": "Advanced summarization with structured outputs"
+        "description": "Advanced, more reliable (requires credits)"
     },
     "anthropic/claude-3.5-sonnet": {
-        "name": "Claude 3.5 Sonnet",
+        "name": "Claude 3.5 Sonnet (Paid)",
         "max_tokens": 8192,
-        "description": "Excellent for detailed academic summaries"
+        "description": "Best quality (requires credits)"
     }
 }
 

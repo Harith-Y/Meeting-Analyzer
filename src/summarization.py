@@ -27,7 +27,7 @@ class SummaryGenerator:
         self,
         transcript: str,
         summary_type: str = "class_lecture",
-        model: str = "google/gemini-2.0-flash-exp:free",
+        model: str = "meta-llama/llama-3.1-8b-instruct:free",
         custom_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -65,34 +65,56 @@ class SummaryGenerator:
         prompt = prompt_template.format(transcript=transcript)
         
         try:
-            # Call OpenRouter API
+            # Call OpenRouter API with retry logic for rate limits
             logger.info("Calling OpenRouter API...")
             
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://github.com/yourusername/lecture-transcription",
-                    "X-Title": "Class Lecture Transcription System"
-                },
-                json={
-                    "model": model,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are an expert educational assistant helping students prepare for exams. Provide clear, comprehensive summaries that aid in studying and retention."
+            max_retries = 3
+            retry_delay = 5  # seconds
+            
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(
+                        url="https://openrouter.ai/api/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://github.com/yourusername/lecture-transcription",
+                            "X-Title": "Class Lecture Transcription System"
                         },
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": self.models.get(model, {}).get('max_tokens', 4096)
-                },
-                timeout=120
-            )
+                        json={
+                            "model": model,
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": "You are an expert educational assistant helping students prepare for exams. Provide clear, comprehensive summaries that aid in studying and retention."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": prompt
+                                }
+                            ],
+                            "temperature": 0.7,
+                            "max_tokens": self.models.get(model, {}).get('max_tokens', 4096)
+                        },
+                        timeout=120
+                    )
+                    
+                    # If we get a 429 (rate limit), retry
+                    if response.status_code == 429 and attempt < max_retries - 1:
+                        logger.warning(f"Rate limited (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay} seconds...")
+                        import time
+                        time.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    
+                    # Exit retry loop if successful or final attempt
+                    break
+                    
+                except requests.Timeout:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Timeout (attempt {attempt + 1}/{max_retries}), retrying...")
+                        continue
+                    raise
             
             # Check response
             if response.status_code == 200:
@@ -143,7 +165,7 @@ class SummaryGenerator:
         Args:
             transcript: The transcript text
             max_points: Maximum number of key points to extract
-        
+        meta-llama/llama-3.1-8b-instruct
         Returns:
             dict: Key points and metadata
         """
@@ -224,7 +246,7 @@ Exam Questions:"""
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "google/gemini-2.0-flash-exp:free",
+                    "model": "meta-llama/llama-3.1-8b-instruct:free",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.7,
                     "max_tokens": 2000

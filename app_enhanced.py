@@ -92,6 +92,19 @@ def main():
         # Summary options
         st.subheader("Summary Options")
         
+        summary_model = st.selectbox(
+            "Summary Model",
+            options=['meta-llama/llama-3.1-8b-instruct:free', 
+                     'google/gemini-2.0-flash-exp:free',
+                     'nousresearch/hermes-3-llama-3.1-405b:free'],
+            format_func=lambda x: {
+                'meta-llama/llama-3.1-8b-instruct:free': '🦙 Llama 3.1 8B (Recommended)',
+                'google/gemini-2.0-flash-exp:free': '✨ Gemini Flash (May be limited)',
+                'nousresearch/hermes-3-llama-3.1-405b:free': '🧠 Hermes 405B (Powerful)'
+            }[x],
+            help="Choose the AI model for summarization (all free)"
+        )
+        
         summary_type = st.selectbox(
             "Summary Type",
             options=['class_lecture', 'brief_summary', 'detailed_notes'],
@@ -167,6 +180,7 @@ def main():
             process_lecture(
                 audio_file,
                 transcription_model,
+                summary_model,
                 summary_type,
                 include_key_points,
                 include_exam_questions,
@@ -189,6 +203,7 @@ def main():
 def process_lecture(
     audio_file,
     transcription_model: str,
+    summary_model: str,
     summary_type: str,
     include_key_points: bool,
     include_exam_questions: bool,
@@ -241,7 +256,8 @@ def process_lecture(
         
         summary_result = summary_generator.generate_summary(
             transcript_result['formatted_transcript'],
-            summary_type=summary_type
+            summary_type=summary_type,
+            model=summary_model
         )
         
         if not summary_result['success']:
