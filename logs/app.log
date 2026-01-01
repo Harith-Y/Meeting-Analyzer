@@ -1,0 +1,46 @@
+2026-01-02 00:41:25 - src.file_exporter - INFO - reportlab not installed. PDF export will not be available.
+2026-01-02 00:41:25 - src.file_exporter - INFO - Install with: pip install reportlab
+2026-01-02 00:41:26 - src.audio_processor - ERROR - FFmpeg is not installed or not in PATH
+2026-01-02 00:46:03 - src.audio_processor - ERROR - FFmpeg is not installed or not in PATH
+2026-01-02 00:49:13 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:50:22 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:50:29 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:52:49 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:52:52 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:52:52 - __main__ - INFO - Starting lecture processing: AAD_10-Nov.m4a
+2026-01-02 00:52:52 - src.transcription - INFO - Starting transcription with model: openai/whisper-large-v3
+2026-01-02 00:52:52 - src.transcription - INFO - Saved uploaded file to: C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.m4a
+2026-01-02 00:52:54 - src.audio_processor - INFO - Audio file validated: temp_audio.m4a - 01:09:00 - 45.45 MB
+2026-01-02 00:52:54 - src.audio_processor - INFO - Converting C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.m4a to WAV format...
+2026-01-02 00:53:09 - src.audio_processor - INFO - Conversion successful: C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.wav
+2026-01-02 00:53:09 - src.transcription - INFO - Audio converted to WAV: C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.wav
+2026-01-02 00:53:09 - src.transcription - INFO - Executing transcription command with OpenAI Whisper Large V3 (Accurate)
+2026-01-02 00:53:12 - src.transcription - INFO - Transcription completed successfully. Word count: 9
+2026-01-02 00:53:12 - src.summarization - INFO - Generating class_lecture summary using deepseek/deepseek-chat-v3.1:free
+2026-01-02 00:53:12 - src.summarization - INFO - Calling OpenRouter API...
+2026-01-02 00:53:14 - src.summarization - ERROR - API error 404: {"error":{"message":"No endpoints found for deepseek/deepseek-chat-v3.1:free.","code":404},"user_id":"user_2zMZEZOvBkvAFMnVFs6hOBKWLSP"}
+2026-01-02 00:53:14 - __main__ - WARNING - Summary failed: API error 404: {"error":{"message":"No endpoints found for deepseek/deepseek-chat-v3.1:free.","code":404},"user_id":"user_2zMZEZOvBkvAFMnVFs6hOBKWLSP"}
+2026-01-02 00:53:14 - src.summarization - INFO - Extracting up to 10 key points...
+2026-01-02 00:53:16 - src.summarization - INFO - Generating 5 potential exam questions...
+2026-01-02 00:53:18 - __main__ - INFO - Lecture processing completed successfully
+2026-01-02 00:53:29 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:56:14 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:56:26 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:56:30 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:56:32 - src.audio_processor - INFO - FFmpeg is installed and accessible
+2026-01-02 00:56:32 - __main__ - INFO - Starting lecture processing: AAD_10-Nov.m4a
+2026-01-02 00:56:32 - src.transcription - INFO - Starting transcription with model: nvidia/parakeet-ctc-1.1b-asr
+2026-01-02 00:56:32 - src.transcription - INFO - Saved uploaded file to: C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.m4a
+2026-01-02 00:56:33 - src.audio_processor - INFO - Audio file validated: temp_audio.m4a - 01:09:00 - 45.45 MB
+2026-01-02 00:56:33 - src.audio_processor - INFO - Converting C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.m4a to WAV format...
+2026-01-02 00:56:39 - src.audio_processor - INFO - Conversion successful: C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.wav
+2026-01-02 00:56:39 - src.transcription - INFO - Audio converted to WAV: C:\Users\yhari\Documents\Coding\Meeting-Analyzer\temp\temp_audio.wav
+2026-01-02 00:56:39 - src.transcription - INFO - Executing transcription command with NVIDIA Parakeet (Fast)
+2026-01-02 01:06:01 - src.transcription - INFO - Transcription completed successfully. Word count: 6994
+2026-01-02 01:06:01 - src.summarization - INFO - Generating class_lecture summary using google/gemini-2.0-flash-exp:free
+2026-01-02 01:06:01 - src.summarization - INFO - Calling OpenRouter API...
+2026-01-02 01:06:06 - src.summarization - ERROR - API error 429: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemini-2.0-flash-exp:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google"}},"user_id":"user_2zMZEZOvBkvAFMnVFs6hOBKWLSP"}
+2026-01-02 01:06:06 - __main__ - WARNING - Summary failed: API error 429: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemini-2.0-flash-exp:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google"}},"user_id":"user_2zMZEZOvBkvAFMnVFs6hOBKWLSP"}
+2026-01-02 01:06:06 - src.summarization - INFO - Extracting up to 10 key points...
+2026-01-02 01:06:09 - src.summarization - INFO - Generating 5 potential exam questions...
+2026-01-02 01:06:12 - __main__ - INFO - Lecture processing completed successfully
