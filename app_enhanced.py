@@ -300,7 +300,9 @@ def process_lecture(
             exported_files = exporter.export_complete_session(
                 transcript_result,
                 summary_result,
-                base_filename
+                base_filename,
+                key_points_result=key_points_result,
+                exam_questions_result=exam_questions_result
             )
             
             st.success(f"✅ Exported {len(exported_files)} files!")
@@ -396,27 +398,31 @@ def display_results(
     with tabs[2]:
         st.subheader("Key Points")
         
-        if show_key_points and hasattr(st.session_state, 'key_points_result'):
+        if hasattr(st.session_state, 'key_points_result') and st.session_state.key_points_result:
             key_points_result = st.session_state.key_points_result
-            if key_points_result and key_points_result.get('success'):
+            if key_points_result.get('success'):
                 st.markdown(key_points_result.get('key_points_text', ''))
             else:
-                st.info("Key points extraction was not enabled")
-        else:
+                st.warning("Key points extraction failed")
+        elif not show_key_points:
             st.info("Key points extraction was not enabled")
+        else:
+            st.info("No key points available")
     
     # Exam Questions tab
     with tabs[3]:
         st.subheader("Potential Exam Questions")
         
-        if show_exam_questions and hasattr(st.session_state, 'exam_questions_result'):
+        if hasattr(st.session_state, 'exam_questions_result') and st.session_state.exam_questions_result:
             exam_questions_result = st.session_state.exam_questions_result
-            if exam_questions_result and exam_questions_result.get('success'):
+            if exam_questions_result.get('success'):
                 st.markdown(exam_questions_result.get('questions', ''))
             else:
-                st.info("Exam question generation was not enabled")
-        else:
+                st.warning("Exam question generation failed")
+        elif not show_exam_questions:
             st.info("Exam question generation was not enabled")
+        else:
+            st.info("No exam questions available")
     
     # Metadata tab
     with tabs[4]:

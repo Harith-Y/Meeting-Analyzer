@@ -133,7 +133,9 @@ class FileExporter:
         self,
         transcript_result: Dict[str, Any],
         summary_result: Dict[str, Any],
-        base_filename: str
+        base_filename: str,
+        key_points_result: Optional[Dict[str, Any]] = None,
+        exam_questions_result: Optional[Dict[str, Any]] = None
     ) -> Dict[str, str]:
         """
         Export complete transcription session (transcript + summary) in multiple formats.
@@ -142,6 +144,8 @@ class FileExporter:
             transcript_result: Transcription result dictionary
             summary_result: Summary result dictionary
             base_filename: Base filename for all exports
+            key_points_result: Optional key points result dictionary
+            exam_questions_result: Optional exam questions result dictionary
         
         Returns:
             dict: Dictionary with paths to all exported files
@@ -187,6 +191,29 @@ class FileExporter:
 
 {summary_result.get('summary', '')}
 """
+            
+            # Add key points if available
+            if key_points_result and key_points_result.get('success'):
+                combined_md_content += f"""
+
+---
+
+## Key Points
+
+{key_points_result.get('key_points_text', '')}
+"""
+            
+            # Add exam questions if available
+            if exam_questions_result and exam_questions_result.get('success'):
+                combined_md_content += f"""
+
+---
+
+## Potential Exam Questions
+
+{exam_questions_result.get('questions', '')}
+"""
+            
             combined_md = self.export_to_markdown(
                 combined_md_content,
                 f"{base_filename}_complete",
@@ -213,6 +240,21 @@ class FileExporter:
                 },
                 'audio_info': transcript_result.get('audio_metadata', {})
             }
+            
+            # Add key points if available
+            if key_points_result and key_points_result.get('success'):
+                complete_data['key_points'] = {
+                    'text': key_points_result.get('key_points_text', ''),
+                    'points': key_points_result.get('key_points', [])
+                }
+            
+            # Add exam questions if available
+            if exam_questions_result and exam_questions_result.get('success'):
+                complete_data['exam_questions'] = {
+                    'text': exam_questions_result.get('questions', ''),
+                    'questions': exam_questions_result.get('questions_list', [])
+                }
+            
             json_file = self.export_to_json(complete_data, f"{base_filename}_data")
             exported_files['json'] = json_file
             
