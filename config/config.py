@@ -45,8 +45,8 @@ TRANSCRIPTION_MODELS = {
 
 # Summary Models Configuration
 SUMMARY_MODELS = {
-    "meta-llama/llama-3.1-8b-instruct:free": {
-        "name": "Llama 3.1 8B (Free)",
+    "meta-llama/llama-3.2-3b-instruct:free": {
+        "name": "Llama 3.2 3B (Free)",
         "max_tokens": 4096,
         "description": "Free, reliable summarization (Recommended)"
     },
@@ -59,6 +59,11 @@ SUMMARY_MODELS = {
         "name": "Hermes 3 Llama 405B (Free)",
         "max_tokens": 4096,
         "description": "Free, very capable model"
+    },
+    "microsoft/phi-3-mini-128k-instruct:free": {
+        "name": "Microsoft Phi-3 Mini (Free)",
+        "max_tokens": 4096,
+        "description": "Free Microsoft model"
     },
     "meta-llama/llama-3.3-70b-instruct": {
         "name": "Llama 3.3 70B (Paid)",

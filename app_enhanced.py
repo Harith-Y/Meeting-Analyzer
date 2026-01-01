@@ -94,13 +94,15 @@ def main():
         
         summary_model = st.selectbox(
             "Summary Model",
-            options=['meta-llama/llama-3.1-8b-instruct:free', 
+            options=['meta-llama/llama-3.2-3b-instruct:free', 
                      'google/gemini-2.0-flash-exp:free',
-                     'nousresearch/hermes-3-llama-3.1-405b:free'],
+                     'nousresearch/hermes-3-llama-3.1-405b:free',
+                     'microsoft/phi-3-mini-128k-instruct:free'],
             format_func=lambda x: {
-                'meta-llama/llama-3.1-8b-instruct:free': '🦙 Llama 3.1 8B (Recommended)',
+                'meta-llama/llama-3.2-3b-instruct:free': '🦙 Llama 3.2 3B (Recommended)',
                 'google/gemini-2.0-flash-exp:free': '✨ Gemini Flash (May be limited)',
-                'nousresearch/hermes-3-llama-3.1-405b:free': '🧠 Hermes 405B (Powerful)'
+                'nousresearch/hermes-3-llama-3.1-405b:free': '🧠 Hermes 405B (Powerful)',
+                'microsoft/phi-3-mini-128k-instruct:free': '🔷 Microsoft Phi-3 Mini'
             }[x],
             help="Choose the AI model for summarization (all free)"
         )

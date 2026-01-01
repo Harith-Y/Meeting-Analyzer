@@ -27,7 +27,7 @@ class SummaryGenerator:
         self,
         transcript: str,
         summary_type: str = "class_lecture",
-        model: str = "meta-llama/llama-3.1-8b-instruct:free",
+        model: str = "meta-llama/llama-3.2-3b-instruct:free",
         custom_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
