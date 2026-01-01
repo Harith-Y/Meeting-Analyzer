@@ -1,4 +1,90 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment variables
 .env
-__pycache__
-.ipynb_checkpoints
-venv
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+temp_audio*
+
+# Audio files (if you don't want to commit test files)
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+
+# Output files
+outputs/
+*.txt
+*.md
+*.json
+*.pdf
+
+# Exceptions (keep important files)
+!README.md
+!README_NEW.md
+!QUICKSTART.md
+!requirements.txt
+!requirements_new.txt
+!.gitignore
+!.gitkeep
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit
+.streamlit/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb
+
+# Backup files
+*.bak
+*.backup
+Copy.*
