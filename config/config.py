@@ -77,6 +77,18 @@ SUMMARY_MODELS = {
     }
 }
 
+# Speaker Diarization Settings
+DIARIZATION_SETTINGS = {
+    "enabled": False,
+    "max_speakers": 2,
+    "speaker_labels": {
+        0: "Professor",
+        1: "Students"
+    },
+    "format_timestamps": True,
+    "include_confidence": False
+}
+
 # Audio Processing Settings
 AUDIO_SETTINGS = {
     "supported_formats": ["mp3", "wav", "m4a", "flac", "ogg"],

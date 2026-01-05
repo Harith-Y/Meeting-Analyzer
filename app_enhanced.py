@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
+from typing import Dict, Optional
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -88,6 +89,22 @@ def main():
         model_info = TRANSCRIPTION_MODELS[transcription_model]
         st.caption(f"📝 {model_info['description']}")
         st.caption(f"✨ Best for: {model_info['best_for']}")
+        
+        # Speaker Diarization options
+        st.subheader("🎤 Speaker Diarization")
+        enable_diarization = st.checkbox(
+            "Enable Speaker Separation",
+            value=False,
+            help="Separate Professor and Students in the transcript"
+        )
+        
+        if enable_diarization:
+            st.info("💡 The system will distinguish between 2 speakers: Professor and Students")
+            speaker_0_label = st.text_input("Speaker 0 Label", value="Professor", help="Usually the main instructor")
+            speaker_1_label = st.text_input("Speaker 1 Label", value="Students", help="All student voices combined")
+        else:
+            speaker_0_label = "Professor"
+            speaker_1_label = "Students"
         
         # Summary options
         st.subheader("Summary Options")
@@ -187,7 +204,9 @@ def main():
                 include_key_points,
                 include_exam_questions,
                 auto_export,
-                export_formats
+                export_formats,
+                enable_diarization,
+                {0: speaker_0_label, 1: speaker_1_label}
             )
     else:
         st.info("👆 Please upload an audio file to begin")
@@ -210,7 +229,9 @@ def process_lecture(
     include_key_points: bool,
     include_exam_questions: bool,
     auto_export: bool,
-    export_formats: list
+    export_formats: list,
+    enable_diarization: bool = False,
+    speaker_labels: Optional[Dict[int, str]] = None
 ):
     """Process the lecture recording"""
     
@@ -238,13 +259,16 @@ def process_lecture(
         transcript_result = transcription_engine.transcribe(
             audio_file,
             model=transcription_model,
-            progress_callback=update_progress
+            progress_callback=update_progress,
+            enable_diarization=enable_diarization,
+            speaker_labels=speaker_labels
         )
         
         if not transcript_result['success']:
             st.error("❌ Transcription failed")
-            st.error(transcript_result['errors'])
-            logger.error(f"Transcription failed: {transcript_result['errors']}")
+            error_msg = transcript_result.get('errors') or transcript_result.get('error', 'Unknown error')
+            st.error(error_msg)
+            logger.error(f"Transcription failed: {error_msg}")
             return
         
         progress_bar.progress(50)

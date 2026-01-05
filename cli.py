@@ -26,7 +26,9 @@ def process_single_file(
     summary_type: str,
     include_key_points: bool,
     include_exam_questions: bool,
-    export: bool
+    export: bool,
+    enable_diarization: bool = False,
+    speaker_labels: dict = None
 ):
     """Process a single audio file"""
     
@@ -43,9 +45,14 @@ def process_single_file(
         
         # Step 1: Transcribe
         print("\n📝 Step 1/4: Transcribing audio...")
+        if enable_diarization:
+            print("   🎤 Speaker diarization enabled")
+        
         transcript_result = transcription_engine.transcribe(
             file_path,
-            model=transcription_model
+            model=transcription_model,
+            enable_diarization=enable_diarization,
+            speaker_labels=speaker_labels
         )
         
         if not transcript_result['success']:
@@ -122,7 +129,9 @@ def process_batch(
     summary_type: str,
     include_key_points: bool,
     include_exam_questions: bool,
-    export: bool
+    export: bool,
+    enable_diarization: bool = False,
+    speaker_labels: dict = None
 ):
     """Process multiple audio files"""
     
@@ -144,7 +153,9 @@ def process_batch(
             summary_type,
             include_key_points,
             include_exam_questions,
-            export
+            export,
+            enable_diarization,
+            speaker_labels
         ):
             successful += 1
         else:
@@ -228,6 +239,24 @@ Examples:
     )
     
     parser.add_argument(
+        '-d', '--diarization',
+        action='store_true',
+        help='Enable speaker diarization (separate Professor and Students)'
+    )
+    
+    parser.add_argument(
+        '--speaker0',
+        default='Professor',
+        help='Label for speaker 0 (default: Professor)'
+    )
+    
+    parser.add_argument(
+        '--speaker1',
+        default='Students',
+        help='Label for speaker 1 (default: Students)'
+    )
+    
+    parser.add_argument(
         '--no-export',
         action='store_true',
         help='Don\'t export results to files'
@@ -265,6 +294,8 @@ Examples:
         sys.exit(1)
     
     # Process files
+    speaker_labels = {0: args.speaker0, 1: args.speaker1}
+    
     if len(valid_files) == 1:
         # Single file
         success = process_single_file(
@@ -273,7 +304,9 @@ Examples:
             args.summary_type,
             args.key_points,
             args.exam_questions,
-            not args.no_export
+            not args.no_export,
+            args.diarization,
+            speaker_labels
         )
         sys.exit(0 if success else 1)
     else:
@@ -284,7 +317,9 @@ Examples:
             args.summary_type,
             args.key_points,
             args.exam_questions,
-            not args.no_export
+            not args.no_export,
+            args.diarization,
+            speaker_labels
         )
 
 

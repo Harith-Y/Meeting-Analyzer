@@ -28,7 +28,9 @@ class TranscriptionEngine:
         self,
         audio_file,
         model: str = "nvidia/parakeet-ctc-1.1b-asr",
-        progress_callback=None
+        progress_callback=None,
+        enable_diarization: bool = False,
+        speaker_labels: Optional[Dict[int, str]] = None
     ) -> Dict[str, Any]:
         """
         Transcribe audio file using specified model.
@@ -91,7 +93,8 @@ class TranscriptionEngine:
             
             transcript_result = self._run_transcription(
                 wav_audio_path,
-                model_config
+                model_config,
+                enable_diarization=enable_diarization
             )
             
             if not transcript_result['success']:
@@ -101,7 +104,12 @@ class TranscriptionEngine:
             if progress_callback:
                 progress_callback("Formatting transcript...")
             
-            if model == "openai/whisper-large-v3":
+            if enable_diarization and transcript_result.get('has_speakers'):
+                formatted_transcript = self._format_with_speakers(
+                    transcript_result['raw_transcript'],
+                    speaker_labels or {0: "Professor", 1: "Students"}
+                )
+            elif model == "openai/whisper-large-v3":
                 formatted_transcript = self._format_whisper_output(transcript_result['raw_transcript'])
             else:
                 formatted_transcript = self._format_parakeet_output(transcript_result['raw_transcript'])
@@ -132,7 +140,7 @@ class TranscriptionEngine:
             # Cleanup temporary files
             self._cleanup_files([temp_audio_path, wav_audio_path])
     
-    def _run_transcription(self, audio_path: str, model_config: Dict) -> Dict[str, Any]:
+    def _run_transcription(self, audio_path: str, model_config: Dict, enable_diarization: bool = False) -> Dict[str, Any]:
         """
         Run the actual transcription using NVIDIA Riva.
         
@@ -159,26 +167,42 @@ class TranscriptionEngine:
             # Run transcription
             logger.info(f"Executing transcription command with {model_config['name']}")
             
+            # Build command arguments
+            cmd_args = [
+                python_executable,
+                client_script,
+                "--server", "grpc.nvcf.nvidia.com:443",
+                "--use-ssl",
+                "--metadata", "function-id", model_config['function_id'],
+                "--metadata", "authorization", f"Bearer {self.api_key}",
+                "--language-code", model_config['language_code'],
+                "--input-file", audio_path
+            ]
+            
+            # Add diarization flags if enabled
+            if enable_diarization:
+                logger.info("Speaker diarization enabled with max 2 speakers")
+                cmd_args.extend([
+                    "--speaker-diarization",
+                    "--diarization-max-speakers", "2"
+                ])
+            
             result = subprocess.run(
-                [
-                    python_executable,
-                    client_script,
-                    "--server", "grpc.nvcf.nvidia.com:443",
-                    "--use-ssl",
-                    "--metadata", "function-id", model_config['function_id'],
-                    "--metadata", "authorization", f"Bearer {self.api_key}",
-                    "--language-code", model_config['language_code'],
-                    "--input-file", audio_path
-                ],
+                cmd_args,
                 capture_output=True,
                 text=True,
                 check=True,
                 timeout=600  # 10 minute timeout
             )
             
+            # Check if output contains speaker labels
+            raw_output = result.stdout.strip()
+            has_speakers = enable_diarization and ('[speaker' in raw_output.lower() or 'speaker_' in raw_output.lower())
+            
             return {
                 'success': True,
-                'raw_transcript': result.stdout.strip(),
+                'raw_transcript': raw_output,
+                'has_speakers': has_speakers,
                 'warnings': result.stderr if result.stderr else None
             }
             
@@ -261,6 +285,85 @@ class TranscriptionEngine:
             text = text + '.'
         
         return text
+    
+    def _format_with_speakers(self, text: str, speaker_labels: Dict[int, str]) -> str:
+        """
+        Format transcript with speaker labels for diarization output.
+        
+        Args:
+            text: Raw transcription text with speaker markers
+            speaker_labels: Dictionary mapping speaker IDs to labels
+        
+        Returns:
+            str: Formatted transcript with speaker labels
+        """
+        import re
+        
+        lines = text.split('\n')
+        formatted_lines = []
+        current_speaker = None
+        current_text = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Try to detect speaker markers
+            # Format 1: [speaker_0] or [speaker_1]
+            speaker_match = re.match(r'\[speaker[_\s]*(\d+)\]\s*(.*)', line, re.IGNORECASE)
+            if speaker_match:
+                # Save previous speaker's text
+                if current_speaker is not None and current_text:
+                    speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
+                    text_content = ' '.join(current_text).strip()
+                    if text_content:
+                        formatted_lines.append(f"\n**{speaker_label}**: {text_content}")
+                
+                # Start new speaker
+                current_speaker = int(speaker_match.group(1))
+                text_part = speaker_match.group(2).strip()
+                current_text = [text_part] if text_part else []
+            
+            # Format 2: speaker_0: or speaker_1:
+            elif ':' in line:
+                parts = line.split(':', 1)
+                if 'speaker' in parts[0].lower():
+                    speaker_num_match = re.search(r'(\d+)', parts[0])
+                    if speaker_num_match:
+                        # Save previous speaker's text
+                        if current_speaker is not None and current_text:
+                            speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
+                            text_content = ' '.join(current_text).strip()
+                            if text_content:
+                                formatted_lines.append(f"\n**{speaker_label}**: {text_content}")
+                        
+                        # Start new speaker
+                        current_speaker = int(speaker_num_match.group(1))
+                        current_text = [parts[1].strip()] if len(parts) > 1 and parts[1].strip() else []
+                    else:
+                        current_text.append(line)
+                else:
+                    current_text.append(line)
+            else:
+                # Continue current speaker's text
+                current_text.append(line)
+        
+        # Add final speaker's text
+        if current_speaker is not None and current_text:
+            speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
+            text_content = ' '.join(current_text).strip()
+            if text_content:
+                formatted_lines.append(f"\n**{speaker_label}**: {text_content}")
+        
+        # If no speakers detected, fall back to regular formatting
+        if not formatted_lines:
+            logger.warning("No speaker labels detected in output, using standard formatting")
+            return self._format_parakeet_output(text)
+        
+        result = '\n'.join(formatted_lines).strip()
+        logger.info(f"Formatted transcript with {len(set([current_speaker]))} speakers")
+        return result
     
     def _create_error_response(self, error_message: str) -> Dict[str, Any]:
         """Create standardized error response."""
