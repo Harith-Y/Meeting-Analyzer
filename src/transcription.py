@@ -299,7 +299,7 @@ class TranscriptionEngine:
     def _format_with_speakers(self, text: str, speaker_labels: Dict[int, str]) -> str:
         """
         Format transcript with speaker labels for diarization output.
-        Handles Riva's timestamp format: "Time X.XXs: text >>>Time Y.YYs: text"
+        Handles Riva's timestamp format: ">>>Time X.XXs: text" and "Transcript N: text. Timestamps:. Word Start..."
         
         Args:
             text: Raw transcription text with speaker markers and timestamps
@@ -310,108 +310,106 @@ class TranscriptionEngine:
         """
         import re
         
-        # Parse the Riva diarization output
-        # Format: "Timestamps:. Word Start (ms) End (ms) Speaker. word1 start1 end1 speaker_id. word2 start2 end2 speaker_id..."
-        # Or: "Time 1.58s: text >>>Time 1.60s: text"
+        # Split into transcript segments (marked by "Transcript N:")
+        transcript_segments = re.split(r'Transcript \d+:', text)
         
-        formatted_segments = []
-        current_speaker = None
-        current_text = []
+        all_segments = []
         
-        # Split by different possible delimiters
-        segments = re.split(r'>>>|Timestamps:|Transcript \d+:', text)
-        
-        for segment in segments:
-            segment = segment.strip()
-            if not segment or segment in ['Word Start (ms) End (ms) Speaker', '.']:
+        for segment in transcript_segments:
+            if not segment.strip():
                 continue
             
-            # Remove timestamp markers like "Time 1.58s:"
-            cleaned_segment = re.sub(r'Time \d+\.\d+s:\s*', '', segment)
+            # Look for the detailed timestamps section
+            if 'Timestamps:.' in segment or 'Timestamps:' in segment:
+                # Extract the text before timestamps
+                parts = re.split(r'Timestamps?:\.?', segment)
+                if len(parts) >= 2:
+                    # Get the actual transcript text (before timestamps)
+                    transcript_text = parts[0].strip()
+                    
+                    # Get speaker info from the detailed section
+                    timestamps_section = parts[1]
+                    
+                    # Extract speaker IDs from the format "word start end speaker_id"
+                    speaker_matches = re.findall(r'\w+\s+\d+\s+\d+\s+(\d+)', timestamps_section)
+                    
+                    if speaker_matches:
+                        # Use the first speaker ID found (they should all be the same for one segment)
+                        speaker_id = int(speaker_matches[0])
+                        speaker_label = speaker_labels.get(speaker_id, f"Speaker {speaker_id}")
+                        
+                        # Clean the transcript text
+                        cleaned_text = transcript_text.strip()
+                        if cleaned_text and len(cleaned_text) > 1:
+                            all_segments.append((speaker_id, speaker_label, cleaned_text))
             
-            # Look for speaker information in the format "word start end speaker_id"
-            # Extract speaker ID from patterns like "0." or "speaker 0" 
-            speaker_match = re.search(r'(?:Speaker\.?\s*|speaker[_\s]*)(\d+)', segment, re.IGNORECASE)
-            
-            if speaker_match:
-                speaker_id = int(speaker_match.group(1))
-                
-                # If speaker changed, save previous speaker's text
-                if current_speaker is not None and current_speaker != speaker_id and current_text:
-                    speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
-                    combined_text = ' '.join(current_text).strip()
-                    if combined_text:
-                        formatted_segments.append(f"\n**{speaker_label}**: {combined_text}")
-                    current_text = []
-                
-                current_speaker = speaker_id
-                
-                # Extract just the words, removing timestamps and speaker IDs
-                words = re.sub(r'\d+\s+\d+\s+\d+\.?', '', cleaned_segment)
-                words = re.sub(r'Speaker\.?\s*\d+', '', words, flags=re.IGNORECASE)
-                words = words.strip()
-                
-                if words and words not in ['.', ',']:
-                    current_text.append(words)
+            # Also capture incremental updates (>>>Time X.XXs: text)
             else:
-                # No clear speaker marker, just clean text
-                if cleaned_segment and cleaned_segment not in ['.', ',']:
-                    current_text.append(cleaned_segment)
+                # Extract text from time-stamped segments
+                time_segments = re.findall(r'(?:>>>)?Time \d+\.\d+s:\s*([^>]+)', segment)
+                if time_segments:
+                    # Combine these into continuous text (they don't have speaker info yet)
+                    combined = ' '.join([s.strip() for s in time_segments if s.strip()])
+                    if combined and len(combined) > 10:
+                        # These are usually from speaker 0 (professor) if no explicit speaker
+                        all_segments.append((0, speaker_labels.get(0, "Speaker 0"), combined))
+        
+        # Now group consecutive segments by speaker
+        formatted_output = []
+        current_speaker_id = None
+        current_speaker_label = None
+        current_text_parts = []
+        
+        for speaker_id, speaker_label, text in all_segments:
+            if speaker_id != current_speaker_id:
+                # Speaker changed, output previous speaker's text
+                if current_speaker_label and current_text_parts:
+                    combined_text = ' '.join(current_text_parts)
+                    formatted_output.append(f"\n**{current_speaker_label}**: {combined_text}")
+                
+                # Start new speaker
+                current_speaker_id = speaker_id
+                current_speaker_label = speaker_label
+                current_text_parts = [text]
+            else:
+                # Same speaker, accumulate text
+                current_text_parts.append(text)
         
         # Add final speaker's text
-        if current_speaker is not None and current_text:
-            speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
-            combined_text = ' '.join(current_text).strip()
-            if combined_text:
-                formatted_segments.append(f"\n**{speaker_label}**: {combined_text}")
+        if current_speaker_label and current_text_parts:
+            combined_text = ' '.join(current_text_parts)
+            formatted_output.append(f"\n**{current_speaker_label}**: {combined_text}")
         
-        # If parsing failed, try simpler approach
-        if not formatted_segments:
-            logger.warning("Complex parsing failed, using simple timestamp removal")
-            # Just remove timestamps and format as continuous text
-            cleaned = re.sub(r'Time \d+\.\d+s:\s*', ' ', text)
-            cleaned = re.sub(r'>>>+', ' ', cleaned)
-            cleaned = re.sub(r'Timestamps?:\.?', '', cleaned)
-            cleaned = re.sub(r'Word Start \(ms\) End \(ms\) Speaker\.?', '', cleaned)
-            cleaned = re.sub(r'Transcript \d+:', '', cleaned)
-            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-            
-            # Try to split by speaker patterns if present
-            speaker_parts = re.split(r'(Speaker\.?\s*\d+)', cleaned, flags=re.IGNORECASE)
-            
-            current_speaker = None
-            for i, part in enumerate(speaker_parts):
-                speaker_match = re.search(r'Speaker\.?\s*(\d+)', part, re.IGNORECASE)
-                if speaker_match:
-                    current_speaker = int(speaker_match.group(1))
-                elif current_speaker is not None and part.strip():
-                    speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
-                    text_clean = re.sub(r'\d+\s+\d+\s+\d+\.?', '', part).strip()
-                    if text_clean and len(text_clean) > 2:
-                        formatted_segments.append(f"\n**{speaker_label}**: {text_clean}")
-        
-        if formatted_segments:
-            result = '\n'.join(formatted_segments).strip()
+        if formatted_output:
+            result = '\n'.join(formatted_output).strip()
             logger.info(f"Formatted transcript with speaker diarization")
             return result
         else:
-            logger.warning("No speaker diarization detected in output, using standard formatting")
-            # Fall back to standard formatting without timestamps
-            cleaned = re.sub(r'Time \d+\.\d+s:\s*', ' ', text)
-            cleaned = re.sub(r'>>>+', ' ', cleaned)
+            # Fallback: just clean up timestamps and format as continuous text
+            logger.warning("Could not parse speaker segments, cleaning timestamps only")
+            cleaned = re.sub(r'>>>Time \d+\.\d+s:\s*', '', text)
+            cleaned = re.sub(r'Time \d+\.\d+s:\s*', '', cleaned)
+            cleaned = re.sub(r'Transcript \d+:', '', cleaned)
+            cleaned = re.sub(r'Timestamps?:\.?\s*Word Start \(ms\) End \(ms\) Speaker\.?', '', cleaned)
+            cleaned = re.sub(r'\w+\s+\d+\s+\d+\s+\d+\.?', '', cleaned)  # Remove "word start end speaker" lines
             cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-            return self._format_parakeet_output(cleaned)
+            
+            # Just return as single speaker if we can't parse
+            if cleaned and len(cleaned) > 10:
+                return f"**{speaker_labels.get(0, 'Speaker 0')}**: {cleaned}"
+            else:
+                return self._format_parakeet_output(text)
     
     def _strip_timestamps_and_labels(self, text: str) -> str:
         """
-        Remove speaker labels and timestamps from formatted transcript for AI processing.
-        This creates a clean continuous text version.
+        Remove speaker labels, timestamps, and metadata from formatted transcript for AI processing.
+        This creates a clean continuous text version with ONLY the spoken words.
         
         Args:
             text: Formatted transcript with speaker labels
         
         Returns:
-            str: Clean text without labels or formatting
+            str: Clean text without labels, timestamps, or metadata
         """
         import re
         
@@ -421,15 +419,42 @@ class TranscriptionEngine:
         # Remove any remaining markdown formatting
         cleaned = re.sub(r'\*\*([^*]+)\*\*', r'\1', cleaned)
         
-        # Remove timestamp markers
-        cleaned = re.sub(r'Time \d+\.\d+s:\s*', '', cleaned)
+        # Remove ALL timestamp formats
+        cleaned = re.sub(r'>>>Time \d+\.\d+s:\s*', ' ', cleaned)
+        cleaned = re.sub(r'Time \d+\.\d+s:\s*', ' ', cleaned)
         cleaned = re.sub(r'\[\d+:\d+:\d+\]', '', cleaned)
+        cleaned = re.sub(r'>>>+', ' ', cleaned)
+        
+        # Remove transcript markers
+        cleaned = re.sub(r'Transcript \d+:', '', cleaned)
+        
+        # Remove timestamp metadata sections
+        cleaned = re.sub(r'Timestamps?:\.?\s*', '', cleaned)
+        cleaned = re.sub(r'Word Start \(ms\) End \(ms\) Speaker\.?', '', cleaned)
+        
+        # Remove word timing data (format: "word 1234 5678 0")
+        cleaned = re.sub(r'\b\w+\s+\d{3,}\s+\d{3,}\s+\d+\.?\b', '', cleaned)
+        
+        # Remove standalone numbers that look like timestamps
+        cleaned = re.sub(r'\b\d{3,}\s+\d{3,}\s+\d+\.?\b', '', cleaned)
+        
+        # Remove "Speaker N" patterns
+        cleaned = re.sub(r'Speaker\.?\s*\d+', '', cleaned, flags=re.IGNORECASE)
         
         # Clean up multiple spaces and newlines
-        cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove double newlines
-        cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize spaces
+        cleaned = re.sub(r'\n\s*\n+', '\n', cleaned)  # Remove double+ newlines
+        cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize all spaces
+        cleaned = re.sub(r'\.+', '.', cleaned)  # Remove multiple periods
         
-        return cleaned.strip()
+        result = cleaned.strip()
+        
+        # Log the reduction
+        original_length = len(text)
+        cleaned_length = len(result)
+        reduction_pct = ((original_length - cleaned_length) / original_length * 100) if original_length > 0 else 0
+        logger.info(f"Cleaned transcript: {original_length} → {cleaned_length} chars ({reduction_pct:.1f}% reduction)")
+        
+        return result
     
     def _create_error_response(self, error_message: str) -> Dict[str, Any]:
         """Create standardized error response."""
