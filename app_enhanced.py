@@ -100,6 +100,7 @@ def main():
         
         if enable_diarization:
             st.info("💡 The system will distinguish between 2 speakers: Professor and Students")
+            st.warning("⏱️ Speaker diarization significantly increases processing time (up to 60 minutes for long lectures)")
             speaker_0_label = st.text_input("Speaker 0 Label", value="Professor", help="Usually the main instructor")
             speaker_1_label = st.text_input("Speaker 1 Label", value="Students", help="All student voices combined")
         else:

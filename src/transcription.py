@@ -187,12 +187,16 @@ class TranscriptionEngine:
                     "--diarization-max-speakers", "2"
                 ])
             
+            # Set timeout based on whether diarization is enabled
+            # Diarization takes significantly longer, especially for long files
+            timeout_seconds = 3600 if enable_diarization else 600  # 60 min with diarization, 10 min without
+            
             result = subprocess.run(
                 cmd_args,
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=600  # 10 minute timeout
+                timeout=timeout_seconds
             )
             
             # Check if output contains speaker labels
@@ -207,7 +211,8 @@ class TranscriptionEngine:
             }
             
         except subprocess.TimeoutExpired:
-            error_msg = "Transcription timed out after 10 minutes. Try processing a shorter audio file."
+            timeout_min = 60 if enable_diarization else 10
+            error_msg = f"Transcription timed out after {timeout_min} minutes. Try processing a shorter audio file or disable speaker diarization."
             logger.error(error_msg)
             return {'success': False, 'error': error_msg}
         
