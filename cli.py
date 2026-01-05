@@ -61,10 +61,13 @@ def process_single_file(
         
         print(f"✅ Transcription complete ({transcript_result['word_count']} words)")
         
+        # Use clean transcript for AI processing
+        text_for_ai = transcript_result.get('clean_transcript', transcript_result['formatted_transcript'])
+        
         # Step 2: Generate summary
         print("\n📚 Step 2/4: Generating summary...")
         summary_result = summary_generator.generate_summary(
-            transcript_result['formatted_transcript'],
+            text_for_ai,
             summary_type=summary_type
         )
         
@@ -78,7 +81,7 @@ def process_single_file(
         if include_key_points:
             print("\n🔑 Step 3/4: Extracting key points...")
             key_points_result = summary_generator.generate_key_points(
-                transcript_result['formatted_transcript']
+                text_for_ai
             )
             if key_points_result['success']:
                 print(f"✅ {key_points_result['count']} key points extracted")
@@ -88,7 +91,7 @@ def process_single_file(
         if include_exam_questions:
             print("\n❓ Step 4/4: Generating exam questions...")
             exam_questions_result = summary_generator.generate_exam_questions(
-                transcript_result['formatted_transcript']
+                text_for_ai
             )
             if exam_questions_result['success']:
                 print("✅ Exam questions generated")

@@ -281,8 +281,11 @@ def process_lecture(
         
         summary_generator = SummaryGenerator(OPENROUTER_API_KEY)
         
+        # Use clean_transcript (without speaker labels/timestamps) for AI processing
+        text_for_ai = transcript_result.get('clean_transcript', transcript_result['formatted_transcript'])
+        
         summary_result = summary_generator.generate_summary(
-            transcript_result['formatted_transcript'],
+            text_for_ai,
             summary_type=summary_type,
             model=summary_model
         )
@@ -302,14 +305,14 @@ def process_lecture(
         if include_key_points:
             status_text.text("🔑 Extracting key points...")
             key_points_result = summary_generator.generate_key_points(
-                transcript_result['formatted_transcript']
+                text_for_ai
             )
             progress_bar.progress(85)
         
         if include_exam_questions:
             status_text.text("📝 Generating exam questions...")
             exam_questions_result = summary_generator.generate_exam_questions(
-                transcript_result['formatted_transcript']
+                text_for_ai
             )
             progress_bar.progress(90)
         
