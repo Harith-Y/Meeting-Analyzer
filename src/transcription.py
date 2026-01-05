@@ -94,7 +94,8 @@ class TranscriptionEngine:
             transcript_result = self._run_transcription(
                 wav_audio_path,
                 model_config,
-                enable_diarization=enable_diarization
+                enable_diarization=enable_diarization,
+                audio_duration_seconds=audio_metadata.get('duration_seconds', 0)
             )
             
             if not transcript_result['success']:
@@ -145,13 +146,15 @@ class TranscriptionEngine:
             # Cleanup temporary files
             self._cleanup_files([temp_audio_path, wav_audio_path])
     
-    def _run_transcription(self, audio_path: str, model_config: Dict, enable_diarization: bool = False) -> Dict[str, Any]:
+    def _run_transcription(self, audio_path: str, model_config: Dict, enable_diarization: bool = False, audio_duration_seconds: float = 0) -> Dict[str, Any]:
         """
         Run the actual transcription using NVIDIA Riva.
         
         Args:
             audio_path: Path to WAV audio file
             model_config: Model configuration dictionary
+            enable_diarization: Whether speaker diarization is enabled
+            audio_duration_seconds: Duration of audio in seconds for timeout calculation
         
         Returns:
             dict: Raw transcription results
@@ -192,9 +195,21 @@ class TranscriptionEngine:
                     "--diarization-max-speakers", "2"
                 ])
             
-            # Set timeout based on whether diarization is enabled
-            # Diarization takes significantly longer, especially for long files
-            timeout_seconds = 3600 if enable_diarization else 600  # 60 min with diarization, 10 min without
+            # Set timeout based on audio duration and whether diarization is enabled
+            # Rule: audio_duration * 2 (minimum 10 min, maximum 2 hours)
+            # Diarization adds significant overhead, so use longer timeout
+            if audio_duration_seconds > 0:
+                if enable_diarization:
+                    # Diarization is 3-4x slower
+                    timeout_seconds = min(max(audio_duration_seconds * 4, 600), 7200)
+                else:
+                    # Regular transcription is about 2x slower than real-time
+                    timeout_seconds = min(max(audio_duration_seconds * 2, 600), 7200)
+            else:
+                # Fallback if duration unknown
+                timeout_seconds = 3600 if enable_diarization else 1800
+            
+            logger.info(f"Transcription timeout set to {timeout_seconds/60:.1f} minutes")
             
             result = subprocess.run(
                 cmd_args,
@@ -206,7 +221,11 @@ class TranscriptionEngine:
             
             # Check if output contains speaker labels
             raw_output = result.stdout.strip()
-            has_speakers = enable_diarization and ('[speaker' in raw_output.lower() or 'speaker_' in raw_output.lower())
+            # Riva diarization output contains "Transcript N:" and "Speaker." in metadata
+            has_speakers = enable_diarization and ('Transcript' in raw_output and 'Speaker' in raw_output)
+            
+            if enable_diarization:
+                logger.info(f"Diarization output detection: has_speakers={has_speakers}")
             
             return {
                 'success': True,
@@ -216,8 +235,8 @@ class TranscriptionEngine:
             }
             
         except subprocess.TimeoutExpired:
-            timeout_min = 60 if enable_diarization else 10
-            error_msg = f"Transcription timed out after {timeout_min} minutes. Try processing a shorter audio file or disable speaker diarization."
+            timeout_min = timeout_seconds / 60 if 'timeout_seconds' in locals() else (60 if enable_diarization else 30)
+            error_msg = f"Transcription timed out after {timeout_min:.1f} minutes. The audio file may be too long or try again later."
             logger.error(error_msg)
             return {'success': False, 'error': error_msg}
         
@@ -299,7 +318,7 @@ class TranscriptionEngine:
     def _format_with_speakers(self, text: str, speaker_labels: Dict[int, str]) -> str:
         """
         Format transcript with speaker labels for diarization output.
-        Handles Riva's timestamp format: ">>>Time X.XXs: text" and "Transcript N: text. Timestamps:. Word Start..."
+        Extracts ONLY the clean text from "Transcript N: text." sections.
         
         Args:
             text: Raw transcription text with speaker markers and timestamps
@@ -310,95 +329,95 @@ class TranscriptionEngine:
         """
         import re
         
-        # Split into transcript segments (marked by "Transcript N:")
-        transcript_segments = re.split(r'Transcript \d+:', text)
+        logger.info("Parsing diarized transcript with speaker labels")
         
-        all_segments = []
+        # Strategy: Find all "Transcript N: actual_clean_text." patterns
+        # These contain the final transcribed text without timestamps
+        # Format: "Transcript 0: i also have methods in a. Timestamps:. Word Start..."
         
-        for segment in transcript_segments:
-            if not segment.strip():
+        # Split by "Transcript" to get segments
+        segments_raw = re.split(r'Transcript \d+:', text)
+        
+        parsed_segments = []
+        
+        for segment in segments_raw:
+            if not segment.strip() or len(segment) < 5:
                 continue
             
-            # Look for the detailed timestamps section
-            if 'Timestamps:.' in segment or 'Timestamps:' in segment:
-                # Extract the text before timestamps
-                parts = re.split(r'Timestamps?:\.?', segment)
-                if len(parts) >= 2:
-                    # Get the actual transcript text (before timestamps)
-                    transcript_text = parts[0].strip()
-                    
-                    # Get speaker info from the detailed section
-                    timestamps_section = parts[1]
-                    
-                    # Extract speaker IDs from the format "word start end speaker_id"
-                    speaker_matches = re.findall(r'\w+\s+\d+\s+\d+\s+(\d+)', timestamps_section)
-                    
-                    if speaker_matches:
-                        # Use the first speaker ID found (they should all be the same for one segment)
-                        speaker_id = int(speaker_matches[0])
-                        speaker_label = speaker_labels.get(speaker_id, f"Speaker {speaker_id}")
-                        
-                        # Clean the transcript text
-                        cleaned_text = transcript_text.strip()
-                        if cleaned_text and len(cleaned_text) > 1:
-                            all_segments.append((speaker_id, speaker_label, cleaned_text))
+            # The clean text is everything between start and "Timestamps:"
+            # Extract text before "Timestamps:"
+            before_timestamps = segment.split('Timestamps:')[0].strip()
             
-            # Also capture incremental updates (>>>Time X.XXs: text)
-            else:
-                # Extract text from time-stamped segments
-                time_segments = re.findall(r'(?:>>>)?Time \d+\.\d+s:\s*([^>]+)', segment)
-                if time_segments:
-                    # Combine these into continuous text (they don't have speaker info yet)
-                    combined = ' '.join([s.strip() for s in time_segments if s.strip()])
-                    if combined and len(combined) > 10:
-                        # These are usually from speaker 0 (professor) if no explicit speaker
-                        all_segments.append((0, speaker_labels.get(0, "Speaker 0"), combined))
+            # Remove any remaining "Time X.XXs:" markers
+            before_timestamps = re.sub(r'Time \d+\.\d+s:', '', before_timestamps)
+            before_timestamps = re.sub(r'>>>+', '', before_timestamps)
+            
+            # Clean up and get just the sentence
+            # The actual transcript is usually at the start, ending with a period
+            lines = before_timestamps.split('\n')
+            for line in lines:
+                line = line.strip()
+                # Look for actual sentences (not metadata)
+                if line and not re.match(r'^(Word|Start|End|Speaker)', line) and len(line) > 3:
+                    # Remove trailing period for now
+                    clean_line = line.rstrip('.')
+                    if clean_line:
+                        # Now find speaker ID from the metadata section after "Timestamps:"
+                        speaker_id = 0  # default
+                        
+                        # Look for speaker in the full segment
+                        if 'Timestamps:' in segment:
+                            metadata = segment.split('Timestamps:')[1] if len(segment.split('Timestamps:')) > 1 else ""
+                            # Find first occurrence of pattern "word start_ms end_ms speaker_id"
+                            speaker_match = re.search(r'\w+\s+\d+\s+\d+\s+(\d+)', metadata)
+                            if speaker_match:
+                                speaker_id = int(speaker_match.group(1))
+                        
+                        parsed_segments.append((speaker_id, clean_line))
+                        break  # Only take first valid line per segment
         
-        # Now group consecutive segments by speaker
-        formatted_output = []
-        current_speaker_id = None
-        current_speaker_label = None
-        current_text_parts = []
+        if not parsed_segments:
+            logger.error("Failed to parse any transcript segments!")
+            logger.debug(f"Raw text sample: {text[:500]}...")
+            return self._format_parakeet_output(text)
         
-        for speaker_id, speaker_label, text in all_segments:
-            if speaker_id != current_speaker_id:
-                # Speaker changed, output previous speaker's text
-                if current_speaker_label and current_text_parts:
-                    combined_text = ' '.join(current_text_parts)
-                    formatted_output.append(f"\n**{current_speaker_label}**: {combined_text}")
+        logger.info(f"Successfully parsed {len(parsed_segments)} transcript segments")
+        
+        # Group by speaker and format
+        formatted_lines = []
+        current_speaker = None
+        current_texts = []
+        
+        for speaker_id, text_content in parsed_segments:
+            if speaker_id != current_speaker:
+                # Save previous speaker's text
+                if current_speaker is not None and current_texts:
+                    speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
+                    combined = ' '.join(current_texts)
+                    formatted_lines.append(f"\n**{speaker_label}**: {combined}.")
                 
                 # Start new speaker
-                current_speaker_id = speaker_id
-                current_speaker_label = speaker_label
-                current_text_parts = [text]
+                current_speaker = speaker_id
+                current_texts = [text_content]
             else:
-                # Same speaker, accumulate text
-                current_text_parts.append(text)
+                # Same speaker, accumulate
+                current_texts.append(text_content)
         
-        # Add final speaker's text
-        if current_speaker_label and current_text_parts:
-            combined_text = ' '.join(current_text_parts)
-            formatted_output.append(f"\n**{current_speaker_label}**: {combined_text}")
+        # Add final speaker
+        if current_speaker is not None and current_texts:
+            speaker_label = speaker_labels.get(current_speaker, f"Speaker {current_speaker}")
+            combined = ' '.join(current_texts)
+            formatted_lines.append(f"\n**{speaker_label}**: {combined}.")
         
-        if formatted_output:
-            result = '\n'.join(formatted_output).strip()
-            logger.info(f"Formatted transcript with speaker diarization")
-            return result
-        else:
-            # Fallback: just clean up timestamps and format as continuous text
-            logger.warning("Could not parse speaker segments, cleaning timestamps only")
-            cleaned = re.sub(r'>>>Time \d+\.\d+s:\s*', '', text)
-            cleaned = re.sub(r'Time \d+\.\d+s:\s*', '', cleaned)
-            cleaned = re.sub(r'Transcript \d+:', '', cleaned)
-            cleaned = re.sub(r'Timestamps?:\.?\s*Word Start \(ms\) End \(ms\) Speaker\.?', '', cleaned)
-            cleaned = re.sub(r'\w+\s+\d+\s+\d+\s+\d+\.?', '', cleaned)  # Remove "word start end speaker" lines
-            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-            
-            # Just return as single speaker if we can't parse
-            if cleaned and len(cleaned) > 10:
-                return f"**{speaker_labels.get(0, 'Speaker 0')}**: {cleaned}"
-            else:
-                return self._format_parakeet_output(text)
+        result = '\n'.join(formatted_lines).strip()
+        
+        # Log reduction
+        original_len = len(text)
+        formatted_len = len(result)
+        reduction = ((original_len - formatted_len) / original_len * 100) if original_len > 0 else 0
+        logger.info(f"Formatting reduced size: {original_len} → {formatted_len} chars ({reduction:.1f}% reduction)")
+        
+        return result
     
     def _strip_timestamps_and_labels(self, text: str) -> str:
         """
