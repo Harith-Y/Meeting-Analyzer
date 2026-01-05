@@ -202,6 +202,50 @@ The application will open in your browser at `http://localhost:8501`
 - Formulas and important facts
 - Connections between concepts
 
+### 🎭 Speaker Diarization (Experimental)
+
+**What is it?**
+- Automatically identifies different speakers in your recording
+- Labels them (e.g., "Professor" and "Students")
+- Shows who said what in the transcript
+
+**When to use:**
+- Lectures with Q&A sessions
+- Panel discussions or guest speakers
+- Interactive classes with student participation
+- Any recording with multiple speakers
+
+**Important Notes:**
+
+⏱️ **Processing Time**: 
+- Diarization is **3-4x slower** than regular transcription
+- 90-minute lecture may take **5-6 hours** to process
+- Network connection must remain stable throughout
+
+📏 **File Size Recommendations**:
+- ✅ **Best results**: Files under 30 minutes
+- ⚠️ **May work**: 30-60 minutes (network stability dependent)
+- ❌ **Not recommended**: Files over 60 minutes
+  - High chance of network timeout
+  - Consider using `split_audio.py` to split into chunks
+
+🔧 **How to use**:
+1. Enable "Speaker Diarization" checkbox in sidebar
+2. Customize speaker labels (default: "Professor" and "Students")
+3. Process the file (be patient!)
+4. Transcript will show: **Speaker Label**: their words here.
+
+💡 **Troubleshooting**:
+- If you get network errors, try without diarization
+- For long lectures, split the file first using `split_audio.py`
+- Use Parakeet model (more reliable for diarization)
+- Ensure stable internet connection before starting
+
+**CLI Usage:**
+```bash
+python cli.py --file lecture.m4a --diarization --speaker0 "Professor" --speaker1 "Students"
+```
+
 ## 📁 Project Structure
 
 ```

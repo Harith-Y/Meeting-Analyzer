@@ -180,41 +180,64 @@ Transcript:
 Key Points:"""
         
         try:
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "google/gemini-2.0-flash-exp:free",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.5,
-                    "max_tokens": 1500
-                },
-                timeout=60
-            )
+            # Retry logic for rate limits
+            max_retries = 3
+            retry_delay = 5
             
-            if response.status_code == 200:
-                key_points_text = response.json()["choices"][0]["message"]["content"]
-                key_points_text = self._clean_summary(key_points_text)
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(
+                        url="https://openrouter.ai/api/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": "google/gemini-2.0-flash-exp:free",
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.5,
+                            "max_tokens": 1500
+                        },
+                        timeout=90
+                    )
+                    
+                    if response.status_code == 429 and attempt < max_retries - 1:
+                        logger.warning(f"Rate limited extracting key points (attempt {attempt + 1}/{max_retries}), retrying...")
+                        import time
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    
+                    if response.status_code == 200:
+                        key_points_text = response.json()["choices"][0]["message"]["content"]
+                        key_points_text = self._clean_summary(key_points_text)
+                        
+                        # Parse into list
+                        key_points_list = self._parse_numbered_list(key_points_text)
+                        
+                        logger.info(f"Successfully extracted {len(key_points_list)} key points")
+                        return {
+                            'success': True,
+                            'key_points': key_points_list,
+                            'key_points_text': key_points_text,
+                            'count': len(key_points_list),
+                            'timestamp': datetime.now().isoformat()
+                        }
+                    else:
+                        error_msg = f"API error {response.status_code}: {response.text}"
+                        logger.error(f"Key points extraction failed: {error_msg}")
+                        return self._create_error_response(error_msg)
                 
-                # Parse into list
-                key_points_list = self._parse_numbered_list(key_points_text)
-                
-                return {
-                    'success': True,
-                    'key_points': key_points_list,
-                    'key_points_text': key_points_text,
-                    'count': len(key_points_list),
-                    'timestamp': datetime.now().isoformat()
-                }
-            else:
-                return self._create_error_response(f"API error: {response.status_code}")
+                except requests.Timeout:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Timeout extracting key points (attempt {attempt + 1}/{max_retries}), retrying...")
+                        continue
+                    raise
         
         except Exception as e:
-            logger.error(f"Error extracting key points: {str(e)}")
-            return self._create_error_response(str(e))
+            error_msg = f"Error extracting key points: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return self._create_error_response(error_msg)
     
     def generate_exam_questions(self, transcript: str, num_questions: int = 5) -> Dict[str, Any]:
         """
@@ -239,37 +262,60 @@ Transcript:
 Exam Questions:"""
         
         try:
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "meta-llama/llama-3.1-8b-instruct:free",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.7,
-                    "max_tokens": 2000
-                },
-                timeout=60
-            )
+            # Retry logic for rate limits
+            max_retries = 3
+            retry_delay = 5
             
-            if response.status_code == 200:
-                questions_text = response.json()["choices"][0]["message"]["content"]
-                questions_text = self._clean_summary(questions_text)
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(
+                        url="https://openrouter.ai/api/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": "meta-llama/llama-3.2-3b-instruct:free",
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.7,
+                            "max_tokens": 2000
+                        },
+                        timeout=90
+                    )
+                    
+                    if response.status_code == 429 and attempt < max_retries - 1:
+                        logger.warning(f"Rate limited generating exam questions (attempt {attempt + 1}/{max_retries}), retrying...")
+                        import time
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    
+                    if response.status_code == 200:
+                        questions_text = response.json()["choices"][0]["message"]["content"]
+                        questions_text = self._clean_summary(questions_text)
+                        
+                        logger.info(f"Successfully generated {num_questions} exam questions")
+                        return {
+                            'success': True,
+                            'questions': questions_text,
+                            'count': num_questions,
+                            'timestamp': datetime.now().isoformat()
+                        }
+                    else:
+                        error_msg = f"API error {response.status_code}: {response.text}"
+                        logger.error(f"Exam questions generation failed: {error_msg}")
+                        return self._create_error_response(error_msg)
                 
-                return {
-                    'success': True,
-                    'questions': questions_text,
-                    'count': num_questions,
-                    'timestamp': datetime.now().isoformat()
-                }
-            else:
-                return self._create_error_response(f"API error: {response.status_code}")
+                except requests.Timeout:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Timeout generating exam questions (attempt {attempt + 1}/{max_retries}), retrying...")
+                        continue
+                    raise
         
         except Exception as e:
-            logger.error(f"Error generating questions: {str(e)}")
-            return self._create_error_response(str(e))
+            error_msg = f"Error generating exam questions: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return self._create_error_response(error_msg)
     
     def _clean_summary(self, text: str) -> str:
         """

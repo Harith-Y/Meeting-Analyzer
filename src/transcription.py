@@ -3,6 +3,7 @@ Enhanced transcription module with improved formatting and error handling
 """
 import subprocess
 import os
+import time
 from pathlib import Path
 from typing import Dict, Optional, Any
 import sys
@@ -159,6 +160,51 @@ class TranscriptionEngine:
         Returns:
             dict: Raw transcription results
         """
+        # Retry logic for network failures (especially with diarization)
+        max_retries = 2 if enable_diarization else 1
+        retry_delay = 5  # seconds
+        
+        for attempt in range(max_retries):
+            if attempt > 0:
+                logger.info(f"Retry attempt {attempt + 1}/{max_retries} after network failure...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            
+            try:
+                return self._execute_transcription(audio_path, model_config, enable_diarization, audio_duration_seconds)
+            except subprocess.CalledProcessError as e:
+                # Check for network-related errors that we can retry
+                error_text = str(e.stderr) if e.stderr else str(e)
+                is_network_error = any(err in error_text.lower() for err in [
+                    'connection', 'unavailable', 'aborted', 'reset', 'timeout', 'network'
+                ])
+                
+                if is_network_error and attempt < max_retries - 1:
+                    logger.warning(f"Network error detected on attempt {attempt + 1}, will retry: {error_text[:200]}")
+                    continue
+                else:
+                    # Not a network error or final attempt failed
+                    raise
+            except subprocess.TimeoutExpired:
+                # Don't retry timeouts
+                raise
+        
+        # Should not reach here, but return error if it does
+        return {'success': False, 'error': 'All retry attempts failed'}
+    
+    def _execute_transcription(self, audio_path: str, model_config: Dict, enable_diarization: bool = False, audio_duration_seconds: float = 0) -> Dict[str, Any]:
+        """
+        Execute a single transcription attempt.
+        
+        Args:
+            audio_path: Path to WAV audio file
+            model_config: Model configuration dictionary
+            enable_diarization: Whether speaker diarization is enabled
+            audio_duration_seconds: Duration of audio in seconds for timeout calculation
+        
+        Returns:
+            dict: Raw transcription results
+        """
         try:
             # Get Python executable
             python_executable = sys.executable
@@ -226,6 +272,9 @@ class TranscriptionEngine:
             
             if enable_diarization:
                 logger.info(f"Diarization output detection: has_speakers={has_speakers}")
+                logger.debug(f"Output preview (first 500 chars): {raw_output[:500]}...")
+                logger.debug(f"Output contains 'Transcript': {'Transcript' in raw_output}")
+                logger.debug(f"Output contains 'Speaker': {'Speaker' in raw_output}")
             
             return {
                 'success': True,
@@ -236,12 +285,32 @@ class TranscriptionEngine:
             
         except subprocess.TimeoutExpired:
             timeout_min = timeout_seconds / 60 if 'timeout_seconds' in locals() else (60 if enable_diarization else 30)
-            error_msg = f"Transcription timed out after {timeout_min:.1f} minutes. The audio file may be too long or try again later."
+            if enable_diarization:
+                error_msg = (f"Transcription with speaker diarization timed out after {timeout_min:.1f} minutes. "
+                           "Long audio files with diarization can take significant time. "
+                           "Consider: 1) Disabling diarization for files > 60 minutes, or 2) Splitting the audio file.")
+            else:
+                error_msg = f"Transcription timed out after {timeout_min:.1f} minutes. The audio file may be too long or try again later."
             logger.error(error_msg)
             return {'success': False, 'error': error_msg}
         
         except subprocess.CalledProcessError as e:
-            error_msg = f"Transcription process failed: {e.stderr}"
+            error_text = str(e.stderr) if e.stderr else str(e)
+            is_network_error = any(err in error_text.lower() for err in [
+                'connection', 'unavailable', 'aborted', 'reset'
+            ])
+            
+            if enable_diarization and is_network_error:
+                error_msg = (f"Network connection failed during diarization: {error_text}\n\n"
+                           "Diarization requires long-running connections which can be unstable. "
+                           "Suggestions:\n"
+                           "1. Try again (network issues can be temporary)\n"
+                           "2. Use a shorter audio file (< 60 minutes)\n"
+                           "3. Check your internet connection stability\n"
+                           "4. Process without diarization and add speaker labels manually")
+            else:
+                error_msg = f"Transcription process failed: {error_text}"
+            
             logger.error(error_msg)
             return {'success': False, 'error': error_msg}
         
@@ -377,8 +446,10 @@ class TranscriptionEngine:
                         break  # Only take first valid line per segment
         
         if not parsed_segments:
-            logger.error("Failed to parse any transcript segments!")
-            logger.debug(f"Raw text sample: {text[:500]}...")
+            logger.error("Failed to parse any transcript segments from diarization output!")
+            logger.error(f"Raw text sample (first 1000 chars): {text[:1000]}")
+            logger.error(f"Raw text length: {len(text)} characters")
+            logger.error("Falling back to standard formatting (no speaker labels)")
             return self._format_parakeet_output(text)
         
         logger.info(f"Successfully parsed {len(parsed_segments)} transcript segments")
@@ -415,7 +486,7 @@ class TranscriptionEngine:
         original_len = len(text)
         formatted_len = len(result)
         reduction = ((original_len - formatted_len) / original_len * 100) if original_len > 0 else 0
-        logger.info(f"Formatting reduced size: {original_len} → {formatted_len} chars ({reduction:.1f}% reduction)")
+        logger.info(f"Formatting reduced size: {original_len} -> {formatted_len} chars ({reduction:.1f}% reduction)")
         
         return result
     
@@ -471,7 +542,7 @@ class TranscriptionEngine:
         original_length = len(text)
         cleaned_length = len(result)
         reduction_pct = ((original_length - cleaned_length) / original_length * 100) if original_length > 0 else 0
-        logger.info(f"Cleaned transcript: {original_length} → {cleaned_length} chars ({reduction_pct:.1f}% reduction)")
+        logger.info(f"Cleaned transcript: {original_length} -> {cleaned_length} chars ({reduction_pct:.1f}% reduction)")
         
         return result
     

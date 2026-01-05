@@ -307,13 +307,20 @@ def process_lecture(
             key_points_result = summary_generator.generate_key_points(
                 text_for_ai
             )
+            if not key_points_result.get('success', False):
+                st.warning(f"⚠️ Key points extraction failed: {key_points_result.get('error', 'Unknown error')}")
+                logger.error(f"Key points extraction failed: {key_points_result.get('error')}")
             progress_bar.progress(85)
         
         if include_exam_questions:
             status_text.text("📝 Generating exam questions...")
             exam_questions_result = summary_generator.generate_exam_questions(
-                text_for_ai
+                text_for_ai,
+                num_questions=20
             )
+            if not exam_questions_result.get('success', False):
+                st.warning(f"⚠️ Exam questions generation failed: {exam_questions_result.get('error', 'Unknown error')}")
+                logger.error(f"Exam questions generation failed: {exam_questions_result.get('error')}")
             progress_bar.progress(90)
         
         # Step 4: Export if enabled
