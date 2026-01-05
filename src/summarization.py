@@ -252,14 +252,54 @@ Key Points:"""
         """
         logger.info(f"Generating {num_questions} potential exam questions...")
         
-        prompt = f"""Based on this class lecture, generate {num_questions} potential exam questions that test understanding of the material.
-Include a mix of question types (multiple choice, short answer, essay).
-Format each question clearly with the question type indicated.
+        prompt = f"""Based ONLY on the content from this class lecture transcript, generate {num_questions} exam questions with detailed answers.
 
-Transcript:
+CRITICAL REQUIREMENTS:
+- Questions must be based ONLY on topics actually covered in this specific lecture
+- Answers must reference specific concepts, examples, or explanations from the lecture
+- Provide comprehensive, detailed answers (3-5 sentences minimum per answer)
+- For multiple choice: include 4 options (A-D), then explain why the correct answer is right and why others are wrong
+
+STRICT FORMAT - Follow this EXACTLY for each question:
+
+**Question 1: Multiple Choice**
+
+[Write a clear question based on a key concept from the lecture]
+
+A) [First option]
+B) [Second option]
+C) [Third option]
+D) [Fourth option]
+
+**Answer:** [Letter]) [Restate correct answer]. [3-5 sentence explanation drawing from lecture content, explaining why this is correct and referencing what was discussed. Make it educational and comprehensive.]
+
+---
+
+**Question 2: Short Answer**
+
+[Ask about an important concept, process, or relationship explained in the lecture]
+
+**Answer:** [Write 4-6 sentences explaining the answer using information from the lecture. Include key terms, examples, or explanations that were mentioned. Make it detailed enough that a student studying from this will understand the topic.]
+
+---
+
+**Question 3: Essay**
+
+[Ask a broader question requiring synthesis of multiple concepts from the lecture]
+
+**Answer:** [Write 6-10 sentences providing a comprehensive answer. Connect multiple ideas from the lecture, explain relationships, provide context, and demonstrate deep understanding of the material covered.]
+
+---
+
+QUESTION MIX:
+- 40% Multiple Choice questions (with detailed explanations)
+- 30% Short Answer questions (4-6 sentence answers)
+- 30% Essay questions (6-10 sentence comprehensive answers)
+
+Lecture Transcript:
 {transcript}
 
-Exam Questions:"""
+Now generate exactly {num_questions} questions following the format above:"""
         
         try:
             # Retry logic for rate limits
@@ -278,7 +318,7 @@ Exam Questions:"""
                             "model": "meta-llama/llama-3.2-3b-instruct:free",
                             "messages": [{"role": "user", "content": prompt}],
                             "temperature": 0.7,
-                            "max_tokens": 2000
+                            "max_tokens": 4000
                         },
                         timeout=90
                     )

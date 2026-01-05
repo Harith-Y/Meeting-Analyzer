@@ -316,7 +316,7 @@ def process_lecture(
             status_text.text("📝 Generating exam questions...")
             exam_questions_result = summary_generator.generate_exam_questions(
                 text_for_ai,
-                num_questions=20
+                num_questions=15
             )
             if not exam_questions_result.get('success', False):
                 st.warning(f"⚠️ Exam questions generation failed: {exam_questions_result.get('error', 'Unknown error')}")
