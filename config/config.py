@@ -22,6 +22,7 @@ TEMP_DIR.mkdir(exist_ok=True)
 # API Keys
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Transcription Models Configuration
 TRANSCRIPTION_MODELS = {

@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config.config import SUMMARY_MODELS, SUMMARY_PROMPTS, OPENROUTER_API_KEY
+from config.config import SUMMARY_MODELS, SUMMARY_PROMPTS, OPENROUTER_API_KEY, GROQ_API_KEY
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -18,8 +18,9 @@ logger = setup_logger(__name__)
 class SummaryGenerator:
     """Generate AI-powered summaries optimized for exam preparation"""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, groq_api_key: Optional[str] = None):
         self.api_key = api_key or OPENROUTER_API_KEY
+        self.groq_api_key = groq_api_key or GROQ_API_KEY
         self.models = SUMMARY_MODELS
         self.prompts = SUMMARY_PROMPTS
     
@@ -180,6 +181,17 @@ Transcript:
 Key Points:"""
         
         try:
+            # Use Groq API for key points (faster and more reliable)
+            if not self.groq_api_key:
+                logger.warning("Groq API key not found, falling back to OpenRouter")
+                api_url = "https://openrouter.ai/api/v1/chat/completions"
+                api_key = self.api_key
+                model = "meta-llama/llama-3.2-3b-instruct:free"
+            else:
+                api_url = "https://api.groq.com/openai/v1/chat/completions"
+                api_key = self.groq_api_key
+                model = "llama-3.3-70b-versatile"
+            
             # Retry logic for rate limits
             max_retries = 3
             retry_delay = 5
@@ -187,13 +199,13 @@ Key Points:"""
             for attempt in range(max_retries):
                 try:
                     response = requests.post(
-                        url="https://openrouter.ai/api/v1/chat/completions",
+                        url=api_url,
                         headers={
-                            "Authorization": f"Bearer {self.api_key}",
+                            "Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json",
                         },
                         json={
-                            "model": "google/gemini-2.0-flash-exp:free",
+                            "model": model,
                             "messages": [{"role": "user", "content": prompt}],
                             "temperature": 0.5,
                             "max_tokens": 1500
@@ -252,54 +264,45 @@ Key Points:"""
         """
         logger.info(f"Generating {num_questions} potential exam questions...")
         
-        prompt = f"""Based ONLY on the content from this class lecture transcript, generate {num_questions} exam questions with detailed answers.
+        prompt = f"""You are a helpful teaching assistant creating study materials for a student. Based on the lecture transcript below, help create {num_questions} practice questions with answer guides to aid exam preparation.
 
-CRITICAL REQUIREMENTS:
-- Questions must be based ONLY on topics actually covered in this specific lecture
-- Answers must reference specific concepts, examples, or explanations from the lecture
-- Provide comprehensive, detailed answers (3-5 sentences minimum per answer)
-- For multiple choice: include 4 options (A-D), then explain why the correct answer is right and why others are wrong
+Guidelines:
+- Focus on important concepts explained in the lecture
+- Include detailed explanations in answers to help students learn
+- Mix question types: ~40% Multiple Choice, ~30% Short Answer, ~30% Essay
 
-STRICT FORMAT - Follow this EXACTLY for each question:
+Format for Multiple Choice:
+**Question X: Multiple Choice**
+[question text]
+A) [option]
+B) [option]  
+C) [option]
+D) [option]
 
-**Question 1: Multiple Choice**
-
-[Write a clear question based on a key concept from the lecture]
-
-A) [First option]
-B) [Second option]
-C) [Third option]
-D) [Fourth option]
-
-**Answer:** [Letter]) [Restate correct answer]. [3-5 sentence explanation drawing from lecture content, explaining why this is correct and referencing what was discussed. Make it educational and comprehensive.]
+**Answer:** [Letter]) [Explanation in 3-5 sentences with details from the lecture]
 
 ---
 
-**Question 2: Short Answer**
+Format for Short Answer:
+**Question X: Short Answer**
+[question text]
 
-[Ask about an important concept, process, or relationship explained in the lecture]
-
-**Answer:** [Write 4-6 sentences explaining the answer using information from the lecture. Include key terms, examples, or explanations that were mentioned. Make it detailed enough that a student studying from this will understand the topic.]
-
----
-
-**Question 3: Essay**
-
-[Ask a broader question requiring synthesis of multiple concepts from the lecture]
-
-**Answer:** [Write 6-10 sentences providing a comprehensive answer. Connect multiple ideas from the lecture, explain relationships, provide context, and demonstrate deep understanding of the material covered.]
+**Answer:** [4-6 sentences explaining the concept with specific details from lecture]
 
 ---
 
-QUESTION MIX:
-- 40% Multiple Choice questions (with detailed explanations)
-- 30% Short Answer questions (4-6 sentence answers)
-- 30% Essay questions (6-10 sentence comprehensive answers)
+Format for Essay:
+**Question X: Essay**
+[question text]
+
+**Answer:** [6-10 sentences providing comprehensive explanation connecting concepts from lecture]
+
+---
 
 Lecture Transcript:
 {transcript}
 
-Now generate exactly {num_questions} questions following the format above:"""
+Please create {num_questions} practice questions with detailed answer guides:"""
         
         try:
             # Retry logic for rate limits
