@@ -87,7 +87,7 @@ class SummaryGenerator:
                             "messages": [
                                 {
                                     "role": "system",
-                                    "content": "You are an expert educational assistant helping students prepare for exams. Provide clear, comprehensive summaries that aid in studying and retention."
+                                    "content": "You are an expert educational assistant and academic tutor. Your goal is to create extremely comprehensive, detailed, and thorough study materials that capture ALL important information. Be expansive and explanatory - students rely on your summaries to fully understand the lecture content. Never be brief when you can be thorough. Quality and completeness are more important than brevity."
                                 },
                                 {
                                     "role": "user",

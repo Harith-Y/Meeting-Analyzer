@@ -48,33 +48,33 @@ TRANSCRIPTION_MODELS = {
 SUMMARY_MODELS = {
     "meta-llama/llama-3.2-3b-instruct:free": {
         "name": "Llama 3.2 3B (Free)",
-        "max_tokens": 4096,
+        "max_tokens": 8192,
         "description": "Free, reliable summarization (Recommended)"
     },
     "google/gemini-2.0-flash-exp:free": {
         "name": "Google Gemini 2.0 Flash (Free)",
-        "max_tokens": 8192,
-        "description": "Free, fast (may be rate-limited)"
+        "max_tokens": 16384,
+        "description": "Free, fast with large context (may be rate-limited)"
     },
     "nousresearch/hermes-3-llama-3.1-405b:free": {
         "name": "Hermes 3 Llama 405B (Free)",
-        "max_tokens": 4096,
-        "description": "Free, very capable model"
+        "max_tokens": 8192,
+        "description": "Free, very capable model with good detail"
     },
     "microsoft/phi-3-mini-128k-instruct:free": {
         "name": "Microsoft Phi-3 Mini (Free)",
-        "max_tokens": 4096,
-        "description": "Free Microsoft model"
+        "max_tokens": 8192,
+        "description": "Free Microsoft model with large context"
     },
     "meta-llama/llama-3.3-70b-instruct": {
         "name": "Llama 3.3 70B (Paid)",
-        "max_tokens": 8192,
-        "description": "Advanced, more reliable (requires credits)"
+        "max_tokens": 16384,
+        "description": "Advanced, more reliable with comprehensive output (requires credits)"
     },
     "anthropic/claude-3.5-sonnet": {
         "name": "Claude 3.5 Sonnet (Paid)",
-        "max_tokens": 8192,
-        "description": "Best quality (requires credits)"
+        "max_tokens": 16384,
+        "description": "Best quality with most detailed output (requires credits)"
     }
 }
 
@@ -101,39 +101,166 @@ AUDIO_SETTINGS = {
 
 # Summary Prompt Templates
 SUMMARY_PROMPTS = {
-    "class_lecture": """You are an expert educational assistant helping students prepare for exams.
+    "class_lecture": """You are an expert educational assistant and academic tutor helping students prepare for exams. Your goal is to create an extremely comprehensive and detailed study guide that captures ALL important information from the lecture.
 
-Analyze this class lecture transcript and provide a comprehensive study guide with:
+IMPORTANT: Be thorough and detailed. Don't summarize - EXPAND and EXPLAIN everything discussed in the lecture.
 
-1. **Main Topics Covered**: List all major topics and concepts discussed
-2. **Key Concepts & Definitions**: Define important terms and concepts
-3. **Important Points**: Highlight critical information students need to remember
-4. **Examples & Explanations**: Summarize any examples or detailed explanations given
-5. **Potential Exam Questions**: Suggest 3-5 questions that might appear on an exam based on this content
-6. **Study Tips**: Brief recommendations on how to study this material
+Analyze this class lecture transcript and provide an extensive study guide with the following sections:
+
+## 1. LECTURE OVERVIEW
+- Course/Subject context (if mentioned)
+- Date and topic of lecture
+- Main themes and objectives
+- How this lecture connects to previous/future topics
+
+## 2. COMPREHENSIVE TOPIC BREAKDOWN
+For EACH major topic discussed, provide:
+- Detailed explanation of the concept
+- Why it's important
+- How it relates to other concepts
+- Any subtopics or related ideas
+- Context and background information
+
+## 3. KEY CONCEPTS & DEFINITIONS (Detailed)
+For EACH important term or concept:
+- Clear, detailed definition
+- Multiple examples if provided
+- Practical applications
+- Common misconceptions or clarifications
+- Related terminology
+
+## 4. DETAILED EXPLANATIONS & REASONING
+- Elaborate on all explanations provided by the instructor
+- Include all reasoning, logic, and thought processes discussed
+- Document step-by-step processes or methodologies
+- Capture all "why" and "how" explanations
+
+## 5. EXAMPLES, CASE STUDIES & ILLUSTRATIONS
+For EACH example mentioned:
+- Describe the example in full detail
+- Explain what concept it illustrates
+- Break down the analysis or solution
+- Note any variations or alternative approaches discussed
+
+## 6. FORMULAS, EQUATIONS & TECHNICAL DETAILS
+- List all formulas, equations, or technical procedures
+- Explain when and how to use each one
+- Include any special cases or limitations
+- Note any tips or tricks mentioned
+
+## 7. IMPORTANT FACTS & POINTS TO MEMORIZE
+- All specific facts, dates, names, or figures mentioned
+- Critical information emphasized by the instructor
+- Information explicitly stated as "important for the exam"
+- Any repetitions or emphasized points
+
+## 8. CONNECTIONS & RELATIONSHIPS
+- How different concepts connect to each other
+- Cause-and-effect relationships
+- Comparisons and contrasts made
+- Hierarchies or categorizations discussed
+
+## 9. INSTRUCTOR'S INSIGHTS & COMMENTARY
+- Personal insights or perspectives shared
+- Real-world applications mentioned
+- Career or practical relevance discussed
+- Any anecdotes or stories that illustrate concepts
+
+## 10. POTENTIAL EXAM QUESTIONS (Detailed)
+Create 5-8 comprehensive exam questions covering:
+- Multiple choice questions with detailed explanations
+- Short answer questions
+- Essay/discussion questions
+- Problem-solving questions (if applicable)
+- Include sample answers or answer guidelines
+
+## 11. STUDY RECOMMENDATIONS
+- Prioritized list of what to focus on
+- Suggested review activities
+- Connections to textbook or readings (if mentioned)
+- Topics that need extra practice or review
+- Study techniques specific to this material
+
+## 12. SUMMARY OF KEY TAKEAWAYS
+- Comprehensive list of 10-15 key takeaways
+- Most critical information to remember
+- Main learning objectives achieved
 
 Transcript:
 {transcript}
 
-Provide a clear, well-organized summary that helps with exam preparation.""",
+---
+
+Provide an EXTREMELY DETAILED and COMPREHENSIVE study guide. Your goal is to help the student understand everything as if they attended the lecture themselves. Be thorough, clear, and organized. Include ALL information from the transcript, not just highlights.""",
     
-    "brief_summary": """Provide a concise summary of this class lecture, focusing on:
-- Main topics covered
-- Key takeaways
-- Important concepts to remember
+    "brief_summary": """Provide a structured overview of this class lecture, focusing on:
+
+**Main Topics Covered:**
+- List all major topics discussed in order
+- Include subtopics and their relationships
+
+**Key Concepts & Definitions:**
+- Define all important terms with clear explanations
+- Provide context for each concept
+
+**Critical Takeaways:**
+- Most important points students must remember
+- Information likely to appear on exams
+- Practical applications mentioned
+
+**Notable Examples:**
+- Key examples used to illustrate concepts
+- Their significance and what they demonstrate
 
 Transcript:
-{transcript}""",
+{transcript}
+
+Be thorough but organized. Include all essential information.""",
     
-    "detailed_notes": """Create detailed study notes from this lecture including:
-- All topics covered with timestamps if available
-- Definitions and explanations
-- Examples and case studies
-- Formulas or important facts
-- Connections between concepts
+    "detailed_notes": """Create extremely detailed and comprehensive study notes from this lecture. Your goal is to capture EVERYTHING discussed:
+
+**COMPLETE TOPIC COVERAGE:**
+- Document every topic, subtopic, and related concept
+- Include full explanations, not summaries
+- Preserve the logical flow and structure of the lecture
+- Note connections between topics
+
+**DEFINITIONS & EXPLANATIONS:**
+- Provide complete definitions for all terminology
+- Include detailed explanations of concepts
+- Document all reasoning and logic discussed
+- Add context and background information
+
+**EXAMPLES & ILLUSTRATIONS:**
+- Describe each example in full detail
+- Explain what each example demonstrates
+- Include any variations or alternative scenarios
+- Note instructor's analysis and insights
+
+**FORMULAS & PROCEDURES:**
+- List all formulas, equations, or procedures
+- Explain when and how to apply them
+- Include any special cases or conditions
+- Note any tips or shortcuts mentioned
+
+**IMPORTANT FACTS & DETAILS:**
+- All specific facts, figures, names, or dates
+- Information emphasized by the instructor
+- Points repeated or highlighted
+- Any exam-relevant information mentioned
+
+**INSTRUCTOR INSIGHTS:**
+- Commentary and perspectives shared
+- Real-world applications discussed
+- Practical relevance and context
+- Any stories or anecdotes that aid understanding
 
 Transcript:
-{transcript}"""
+{transcript}
+
+---
+
+Create notes that are so detailed a student who missed the lecture could learn everything from them. Be thorough, clear, and preserve all important information."""
 }
 
 # Export Settings
