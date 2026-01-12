@@ -9,7 +9,10 @@ from typing import Dict, Optional, Any
 import sys
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Get project root directory
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
 from config.config import TRANSCRIPTION_MODELS, NVIDIA_API_KEY, TEMP_DIR
 from src.audio_processor import AudioProcessor
 from src.logger import setup_logger
@@ -209,22 +212,24 @@ class TranscriptionEngine:
             # Get Python executable
             python_executable = sys.executable
             
-            # Prepare command
-            client_script = f"python-clients/scripts/asr/{model_config['client_file']}"
+            # Prepare command with absolute path
+            client_script = PROJECT_ROOT / "python-clients" / "scripts" / "asr" / model_config['client_file']
             
-            if not os.path.exists(client_script):
+            if not client_script.exists():
                 raise FileNotFoundError(
                     f"Transcription client script not found: {client_script}\n"
+                    f"Looking in: {PROJECT_ROOT / 'python-clients'}\n"
                     "Please ensure python-clients directory is properly set up."
                 )
             
             # Run transcription
             logger.info(f"Executing transcription command with {model_config['name']}")
+            logger.info(f"Using client script: {client_script}")
             
             # Build command arguments
             cmd_args = [
                 python_executable,
-                client_script,
+                str(client_script),
                 "--server", "grpc.nvcf.nvidia.com:443",
                 "--use-ssl",
                 "--metadata", "function-id", model_config['function_id'],
