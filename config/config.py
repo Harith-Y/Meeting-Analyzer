@@ -2,27 +2,64 @@
 Configuration settings for Class Lecture Transcription System
 """
 import os
+import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+# Detect if running in Streamlit Cloud or deployment environment
+IS_CLOUD_DEPLOYMENT = os.getenv("STREAMLIT_SHARING_MODE") or os.getenv("IS_DEPLOYMENT", "false").lower() == "true"
+
 # Base paths
 BASE_DIR = Path(__file__).parent.parent
-OUTPUTS_DIR = BASE_DIR / "outputs"
-LOGS_DIR = BASE_DIR / "logs"
-TEMP_DIR = BASE_DIR / "temp"
 
-# Create directories if they don't exist
-OUTPUTS_DIR.mkdir(exist_ok=True)
-LOGS_DIR.mkdir(exist_ok=True)
-TEMP_DIR.mkdir(exist_ok=True)
+# For cloud deployment, use system temp directory
+if IS_CLOUD_DEPLOYMENT:
+    TEMP_DIR = Path(tempfile.gettempdir()) / "meeting_analyzer"
+    OUTPUTS_DIR = TEMP_DIR / "outputs"
+    LOGS_DIR = TEMP_DIR / "logs"
+else:
+    OUTPUTS_DIR = BASE_DIR / "outputs"
+    LOGS_DIR = BASE_DIR / "logs"
+    TEMP_DIR = BASE_DIR / "temp"
 
-# API Keys
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Create directories if they don't exist (with error handling for read-only filesystems)
+try:
+    TEMP_DIR.mkdir(exist_ok=True, parents=True)
+    OUTPUTS_DIR.mkdir(exist_ok=True, parents=True)
+    LOGS_DIR.mkdir(exist_ok=True, parents=True)
+except (OSError, PermissionError):
+    # If we can't create directories (read-only filesystem), use temp directory
+    TEMP_DIR = Path(tempfile.gettempdir()) / "meeting_analyzer"
+    OUTPUTS_DIR = TEMP_DIR / "outputs"
+    LOGS_DIR = TEMP_DIR / "logs"
+    TEMP_DIR.mkdir(exist_ok=True, parents=True)
+    OUTPUTS_DIR.mkdir(exist_ok=True, parents=True)
+    LOGS_DIR.mkdir(exist_ok=True, parents=True)
+
+# API Keys - Support both .env and Streamlit secrets
+def get_api_key(key_name: str, streamlit_key: str = None) -> str:
+    """Get API key from environment or Streamlit secrets"""
+    # First try environment variable
+    env_value = os.getenv(key_name)
+    if env_value:
+        return env_value
+    
+    # Try Streamlit secrets
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets') and (streamlit_key or key_name) in st.secrets:
+            return st.secrets.get(streamlit_key or key_name, "")
+    except (ImportError, FileNotFoundError, KeyError):
+        pass
+    
+    return ""
+
+NVIDIA_API_KEY = get_api_key("NVIDIA_API_KEY")
+OPENROUTER_API_KEY = get_api_key("OPENROUTER_API_KEY")
+GROQ_API_KEY = get_api_key("GROQ_API_KEY")
 
 # Transcription Models Configuration
 TRANSCRIPTION_MODELS = {

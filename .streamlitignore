@@ -1,0 +1,60 @@
+# Streamlit Ignore File
+# Files and directories to exclude from Streamlit Cloud deployment
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Output directories (not needed in cloud)
+outputs/
+logs/
+temp/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Documentation (keep only essentials)
+IMPROVEMENTS.md
+LARGE_FILES_GUIDE.md
+DIARIZATION_GUIDE.md
+
+# Test files
+tests/
+*.test.py
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Large files
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg

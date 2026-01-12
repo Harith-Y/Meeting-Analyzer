@@ -39,6 +39,9 @@ venv.bak/
 .env.local
 .env.*.local
 
+# Streamlit secrets (IMPORTANT: Never commit!)
+.streamlit/secrets.toml
+
 # Logs
 logs/
 *.log
