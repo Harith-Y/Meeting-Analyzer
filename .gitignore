@@ -61,7 +61,7 @@ temp_audio*
 
 # Output files
 outputs/
-*.txt
+
 *.md
 *.json
 *.pdf

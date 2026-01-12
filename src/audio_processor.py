@@ -124,24 +124,40 @@ class AudioProcessor:
             
             logger.info(f"Converting {input_file} to WAV format...")
             
-            # Convert using FFmpeg with optimized settings for speech recognition
-            (
-                ffmpeg
-                .input(input_file)
-                .output(
-                    output_file,
-                    acodec=self.codec,
-                    ac=self.channels,
-                    ar=self.sample_rate
+            try:
+                # Convert using FFmpeg with optimized settings for speech recognition
+                (
+                    ffmpeg
+                    .input(input_file)
+                    .output(
+                        output_file,
+                        acodec=self.codec,
+                        ac=self.channels,
+                        ar=self.sample_rate
+                    )
+                    .overwrite_output()
+                    .run(capture_stdout=True, capture_stderr=True, quiet=True)
                 )
-                .overwrite_output()
-                .run(capture_stdout=True, capture_stderr=True, quiet=True)
-            )
+                
+                logger.info(f"Conversion successful: {output_file}")
+                return output_file
             
-            logger.info(f"Conversion successful: {output_file}")
-            return output_file
+            except ffmpeg.Error as e:
+                error_message = e.stderr.decode() if e.stderr else str(e)
+                logger.error(f"FFmpeg error during conversion: {error_message}")
+                
+                # If FFmpeg binary not found, provide helpful message
+                if 'ffmpeg' in error_message.lower() and ('not found' in error_message.lower() or 'no such file' in error_message.lower()):
+                    raise ValueError(
+                        "FFmpeg is not installed or not accessible. "
+                        "For Streamlit Cloud: ensure 'packages.txt' contains 'ffmpeg' and redeploy. "
+                        "For local: install FFmpeg from https://ffmpeg.org/download.html"
+                    )
+                else:
+                    raise ValueError(f"Audio conversion failed: {error_message}")
             
         except ffmpeg.Error as e:
+            # This catch is for the outer try block
             error_message = e.stderr.decode() if e.stderr else str(e)
             logger.error(f"FFmpeg error during conversion: {error_message}")
             raise ValueError(f"Audio conversion failed: {error_message}")
@@ -205,15 +221,36 @@ def check_ffmpeg_installed() -> bool:
         bool: True if FFmpeg is installed, False otherwise
     """
     import subprocess
+    import shutil
     
     try:
+        # First try using shutil.which (more reliable for finding executables)
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path:
+            logger.info(f"FFmpeg found at: {ffmpeg_path}")
+            # Verify it actually works
+            result = subprocess.run(
+                ['ffmpeg', '-version'],
+                capture_output=True,
+                check=False,
+                timeout=5
+            )
+            if result.returncode == 0:
+                logger.info("FFmpeg is installed and accessible")
+                return True
+        
+        # If shutil.which didn't find it, try direct execution
         subprocess.run(
             ['ffmpeg', '-version'],
             capture_output=True,
-            check=True
+            check=True,
+            timeout=5
         )
         logger.info("FFmpeg is installed and accessible")
         return True
+    except subprocess.TimeoutExpired:
+        logger.warning("FFmpeg check timed out")
+        return False
     except FileNotFoundError:
         logger.error("FFmpeg is not installed or not in PATH")
         return False

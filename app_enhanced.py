@@ -69,11 +69,17 @@ def main():
         
         # FFmpeg status
         st.subheader("System Check")
-        if check_ffmpeg_installed():
-            st.success("✅ FFmpeg installed")
-        else:
-            st.warning("⚠️ FFmpeg not found")
-            st.caption("Required for converting MP3/M4A files")
+        try:
+            ffmpeg_available = check_ffmpeg_installed()
+            if ffmpeg_available:
+                st.success("✅ FFmpeg installed")
+            else:
+                st.warning("⚠️ FFmpeg not found")
+                st.caption("Required for converting MP3/M4A files")
+                st.info("💡 On Streamlit Cloud: Ensure `packages.txt` contains `ffmpeg` and redeploy")
+        except Exception as e:
+            st.error(f"⚠️ Error checking FFmpeg: {str(e)}")
+            st.caption("Will attempt to use FFmpeg if available")
         
         # Model selection
         st.subheader("Model Selection")
