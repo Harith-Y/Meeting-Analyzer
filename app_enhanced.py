@@ -39,6 +39,10 @@ if 'summary_result' not in st.session_state:
     st.session_state.summary_result = None
 if 'processing_complete' not in st.session_state:
     st.session_state.processing_complete = False
+if 'audio_filename' not in st.session_state:
+    st.session_state.audio_filename = None
+if 'export_formats' not in st.session_state:
+    st.session_state.export_formats = ['Markdown']
 
 
 def main():
@@ -203,6 +207,10 @@ def main():
         )
         
         if process_button:
+            # Store settings in session state
+            st.session_state.audio_filename = os.path.splitext(audio_file.name)[0]
+            st.session_state.export_formats = export_formats
+            
             process_lecture(
                 audio_file,
                 transcription_model,
@@ -389,7 +397,24 @@ def display_results(
         st.subheader("Transcription")
         
         if transcript_result and transcript_result.get('formatted_transcript'):
-            st.markdown(transcript_result['formatted_transcript'])
+            # Get filename and format
+            base_name = st.session_state.get('audio_filename', 'transcript')
+            export_formats = st.session_state.get('export_formats', ['Markdown'])
+            use_markdown = 'Markdown' in export_formats
+            
+            # Download button at top
+            file_ext = 'md' if use_markdown else 'txt'
+            mime_type = 'text/markdown' if use_markdown else 'text/plain'
+            st.download_button(
+                "⬇️ Download Transcript",
+                transcript_result['formatted_transcript'],
+                file_name=f"{base_name}_Transcript.{file_ext}",
+                mime=mime_type,
+                use_container_width=True,
+                type="primary"
+            )
+            
+            st.divider()
             
             # Stats
             col1, col2, col3 = st.columns(3)
@@ -401,13 +426,10 @@ def display_results(
                 duration = transcript_result.get('audio_metadata', {}).get('duration_formatted', 'N/A')
                 st.metric("Duration", duration)
             
-            # Download button
-            st.download_button(
-                "⬇️ Download Transcript",
-                transcript_result['formatted_transcript'],
-                file_name=f"transcript_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain"
-            )
+            st.divider()
+            
+            # Content
+            st.markdown(transcript_result['formatted_transcript'])
         else:
             st.info("No transcript available")
     
@@ -416,7 +438,24 @@ def display_results(
         st.subheader("AI-Generated Summary")
         
         if summary_result and summary_result.get('summary'):
-            st.markdown(summary_result['summary'])
+            # Get filename and format
+            base_name = st.session_state.get('audio_filename', 'summary')
+            export_formats = st.session_state.get('export_formats', ['Markdown'])
+            use_markdown = 'Markdown' in export_formats
+            
+            # Download button at top
+            file_ext = 'md' if use_markdown else 'txt'
+            mime_type = 'text/markdown' if use_markdown else 'text/plain'
+            st.download_button(
+                "⬇️ Download Summary",
+                summary_result['summary'],
+                file_name=f"{base_name}_Summary.{file_ext}",
+                mime=mime_type,
+                use_container_width=True,
+                type="primary"
+            )
+            
+            st.divider()
             
             # Stats
             col1, col2 = st.columns(2)
@@ -425,13 +464,10 @@ def display_results(
             with col2:
                 st.metric("Summary Type", summary_result.get('summary_type', 'N/A'))
             
-            # Download button
-            st.download_button(
-                "⬇️ Download Summary",
-                summary_result['summary'],
-                file_name=f"summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain"
-            )
+            st.divider()
+            
+            # Content
+            st.markdown(summary_result['summary'])
         else:
             st.info("No summary available")
     
@@ -442,6 +478,24 @@ def display_results(
         if hasattr(st.session_state, 'key_points_result') and st.session_state.key_points_result:
             key_points_result = st.session_state.key_points_result
             if key_points_result.get('success'):
+                # Get filename and format
+                base_name = st.session_state.get('audio_filename', 'keypoints')
+                export_formats = st.session_state.get('export_formats', ['Markdown'])
+                use_markdown = 'Markdown' in export_formats
+                
+                # Download button at top
+                file_ext = 'md' if use_markdown else 'txt'
+                mime_type = 'text/markdown' if use_markdown else 'text/plain'
+                st.download_button(
+                    "⬇️ Download Key Points",
+                    key_points_result.get('key_points_text', ''),
+                    file_name=f"{base_name}_KeyPoints.{file_ext}",
+                    mime=mime_type,
+                    use_container_width=True,
+                    type="primary"
+                )
+                
+                st.divider()
                 st.markdown(key_points_result.get('key_points_text', ''))
             else:
                 st.warning("Key points extraction failed")
@@ -457,6 +511,24 @@ def display_results(
         if hasattr(st.session_state, 'exam_questions_result') and st.session_state.exam_questions_result:
             exam_questions_result = st.session_state.exam_questions_result
             if exam_questions_result.get('success'):
+                # Get filename and format
+                base_name = st.session_state.get('audio_filename', 'examquestions')
+                export_formats = st.session_state.get('export_formats', ['Markdown'])
+                use_markdown = 'Markdown' in export_formats
+                
+                # Download button at top
+                file_ext = 'md' if use_markdown else 'txt'
+                mime_type = 'text/markdown' if use_markdown else 'text/plain'
+                st.download_button(
+                    "⬇️ Download Exam Questions",
+                    exam_questions_result.get('questions', ''),
+                    file_name=f"{base_name}_ExamQuestions.{file_ext}",
+                    mime=mime_type,
+                    use_container_width=True,
+                    type="primary"
+                )
+                
+                st.divider()
                 st.markdown(exam_questions_result.get('questions', ''))
             else:
                 st.warning("Exam question generation failed")
