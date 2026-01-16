@@ -28,16 +28,17 @@ class SummaryGenerator:
         self,
         transcript: str,
         summary_type: str = "class_lecture",
-        model: str = "meta-llama/llama-3.2-3b-instruct:free",
+        model: str = "groq:llama-3.3-70b-versatile",
         custom_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate summary from transcript with specified format.
+        Uses Groq API (fast, free, reliable) with OpenRouter fallback.
         
         Args:
             transcript: The full transcript text
             summary_type: Type of summary (class_lecture, brief_summary, detailed_notes)
-            model: Model to use for summarization
+            model: Model to use (prefix with 'groq:' or 'openrouter:', default: groq)
             custom_instructions: Optional custom instructions to add to prompt
         
         Returns:
@@ -45,15 +46,17 @@ class SummaryGenerator:
         """
         logger.info(f"Generating {summary_type} summary using {model}")
         
-        # Validate API key
-        if not self.api_key:
-            error_msg = "OpenRouter API key not found. Please set OPENROUTER_API_KEY in .env file."
-            logger.error(error_msg)
-            return self._create_error_response(error_msg)
-        
-        # Validate model
-        if model not in self.models:
-            logger.warning(f"Model {model} not in config, using anyway...")
+        # Determine provider and model
+        if model.startswith('groq:'):
+            provider = 'groq'
+            actual_model = model.replace('groq:', '')
+        elif model.startswith('openrouter:'):
+            provider = 'openrouter'
+            actual_model = model.replace('openrouter:', '')
+        else:
+            # Default to Groq if no prefix
+            provider = 'groq'
+            actual_model = model
         
         # Get prompt template
         prompt_template = self.prompts.get(summary_type, self.prompts["class_lecture"])
@@ -66,22 +69,98 @@ class SummaryGenerator:
         prompt = prompt_template.format(transcript=transcript)
         
         try:
-            # Call OpenRouter API with retry logic for rate limits
-            logger.info("Calling OpenRouter API...")
+            # Try primary provider first, then fallback
+            providers_to_try = [provider]
+            if provider == 'groq' and self.api_key:
+                providers_to_try.append('openrouter')  # Fallback to OpenRouter
+            elif provider == 'openrouter' and self.groq_api_key:
+                providers_to_try.append('groq')  # Fallback to Groq
             
-            max_retries = 3
-            retry_delay = 5  # seconds
+            last_error = None
+            
+            for current_provider in providers_to_try:
+                try:
+                    result = self._call_api_provider(
+                        current_provider,
+                        actual_model if current_provider == provider else ('llama-3.3-70b-versatile' if current_provider == 'groq' else 'nousresearch/hermes-3-llama-3.1-405b:free'),
+                        prompt,
+                        summary_type
+                    )
+                    
+                    if result['success']:
+                        return result
+                    else:
+                        last_error = result.get('error', 'Unknown error')
+                        logger.warning(f"{current_provider.title()} failed: {last_error}")
+                        continue
+                        
+                except Exception as e:
+                    last_error = str(e)
+                    logger.warning(f"{current_provider.title()} failed: {last_error}")
+                    continue
+            
+            # All providers failed
+            error_msg = f"All API providers failed. Last error: {last_error}"
+            logger.error(error_msg)
+            return self._create_error_response(error_msg)
+        
+        except Exception as e:
+            error_msg = f"Error generating summary: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return self._create_error_response(error_msg)
+    
+    def _call_api_provider(
+        self,
+        provider: str,
+        model: str,
+        prompt: str,
+        summary_type: str
+    ) -> Dict[str, Any]:
+        """
+        Call a specific API provider (Groq or OpenRouter).
+        
+        Args:
+            provider: 'groq' or 'openrouter'
+            model: Model identifier
+            prompt: The prompt text
+            summary_type: Type of summary being generated
+        
+        Returns:
+            dict: API response or error
+        """
+        # Configure API endpoint and headers based on provider
+        if provider == 'groq':
+            if not self.groq_api_key:
+                return self._create_error_response("Groq API key not found")
+            
+            api_url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.groq_api_key}",
+                "Content-Type": "application/json"
+            }
+            logger.info(f"Calling Groq API with model: {model}")
+        else:  # openrouter
+            if not self.api_key:
+                return self._create_error_response("OpenRouter API key not found")
+            
+            api_url = "https://openrouter.ai/api/v1/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/yourusername/lecture-transcription",
+                "X-Title": "Class Lecture Transcription System"
+            }
+            logger.info(f"Calling OpenRouter API with model: {model}")
+        
+        try:
+            max_retries = 2 if provider == 'groq' else 3
+            retry_delay = 3 if provider == 'groq' else 5
             
             for attempt in range(max_retries):
                 try:
                     response = requests.post(
-                        url="https://openrouter.ai/api/v1/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://github.com/yourusername/lecture-transcription",
-                            "X-Title": "Class Lecture Transcription System"
-                        },
+                        url=api_url,
+                        headers=headers,
                         json={
                             "model": model,
                             "messages": [
@@ -95,25 +174,30 @@ class SummaryGenerator:
                                 }
                             ],
                             "temperature": 0.7,
-                            "max_tokens": self.models.get(model, {}).get('max_tokens', 4096)
+                            "max_tokens": 8192 if provider == 'groq' else self.models.get(model, {}).get('max_tokens', 4096)
                         },
                         timeout=120
                     )
                     
-                    # If we get a 429 (rate limit), retry
-                    if response.status_code == 429 and attempt < max_retries - 1:
-                        logger.warning(f"Rate limited (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay} seconds...")
-                        import time
-                        time.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
-                        continue
+                    # Handle rate limiting and spending limits
+                    if response.status_code in (429, 402) and attempt < max_retries - 1:
+                        error_detail = response.text
+                        if response.status_code == 402:
+                            logger.warning(f"{provider.title()} spending limit reached, switching providers...")
+                            raise Exception(f"Spending limit: {error_detail}")
+                        else:
+                            logger.warning(f"Rate limited on {provider.title()} (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
+                            import time
+                            time.sleep(retry_delay)
+                            retry_delay *= 2
+                            continue
                     
                     # Exit retry loop if successful or final attempt
                     break
                     
                 except requests.Timeout:
                     if attempt < max_retries - 1:
-                        logger.warning(f"Timeout (attempt {attempt + 1}/{max_retries}), retrying...")
+                        logger.warning(f"Timeout on {provider.title()} (attempt {attempt + 1}/{max_retries}), retrying...")
                         continue
                     raise
             
@@ -133,15 +217,16 @@ class SummaryGenerator:
                     'summary': summary_text,
                     'summary_type': summary_type,
                     'structured_data': structured_data,
-                    'model': model,
-                    'model_name': self.models.get(model, {}).get('name', model),
+                    'model': f"{provider}:{model}",
+                    'model_name': f"{provider.title()}: {model}",
                     'word_count': len(summary_text.split()),
                     'char_count': len(summary_text),
                     'timestamp': datetime.now().isoformat(),
-                    'usage': response_data.get('usage', {})
+                    'usage': response_data.get('usage', {}),
+                    'provider': provider
                 }
                 
-                logger.info(f"Summary generated successfully. Word count: {result['word_count']}")
+                logger.info(f"Summary generated successfully via {provider.title()}. Word count: {result['word_count']}")
                 return result
             
             else:
@@ -150,13 +235,13 @@ class SummaryGenerator:
                 return self._create_error_response(error_msg)
         
         except requests.Timeout:
-            error_msg = "Request timed out after 120 seconds"
+            error_msg = f"{provider.title()} request timed out after 120 seconds"
             logger.error(error_msg)
             return self._create_error_response(error_msg)
         
         except Exception as e:
-            error_msg = f"Error generating summary: {str(e)}"
-            logger.error(error_msg, exc_info=True)
+            error_msg = f"Error calling {provider.title()}: {str(e)}"
+            logger.error(error_msg)
             return self._create_error_response(error_msg)
     
     def generate_key_points(self, transcript: str, max_points: int = 10) -> Dict[str, Any]:

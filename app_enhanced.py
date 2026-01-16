@@ -122,17 +122,19 @@ def main():
         
         summary_model = st.selectbox(
             "Summary Model",
-            options=['meta-llama/llama-3.2-3b-instruct:free', 
-                     'google/gemini-2.0-flash-exp:free',
-                     'nousresearch/hermes-3-llama-3.1-405b:free',
-                     'microsoft/phi-3-mini-128k-instruct:free'],
+            options=['groq:llama-3.3-70b-versatile',
+                     'groq:llama-3.1-70b-versatile',
+                     'groq:mixtral-8x7b-32768',
+                     'openrouter:nousresearch/hermes-3-llama-3.1-405b:free',
+                     'openrouter:microsoft/phi-3-mini-128k-instruct:free'],
             format_func=lambda x: {
-                'meta-llama/llama-3.2-3b-instruct:free': '🦙 Llama 3.2 3B (Recommended)',
-                'google/gemini-2.0-flash-exp:free': '✨ Gemini Flash (May be limited)',
-                'nousresearch/hermes-3-llama-3.1-405b:free': '🧠 Hermes 405B (Powerful)',
-                'microsoft/phi-3-mini-128k-instruct:free': '🔷 Microsoft Phi-3 Mini'
+                'groq:llama-3.3-70b-versatile': '⚡ Groq Llama 3.3 70B (FREE & FAST - Recommended)',
+                'groq:llama-3.1-70b-versatile': '⚡ Groq Llama 3.1 70B (FREE & FAST)',
+                'groq:mixtral-8x7b-32768': '⚡ Groq Mixtral 8x7B (FREE - Large Context)',
+                'openrouter:nousresearch/hermes-3-llama-3.1-405b:free': '🧠 Hermes 405B (Free, may be limited)',
+                'openrouter:microsoft/phi-3-mini-128k-instruct:free': '🔷 Phi-3 Mini (Free, may be limited)'
             }[x],
-            help="Choose the AI model for summarization (all free)"
+            help="Groq models are FREE, FAST, and RELIABLE (no rate limits with your API key)"
         )
         
         summary_type = st.selectbox(

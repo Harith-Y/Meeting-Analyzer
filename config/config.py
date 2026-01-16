@@ -83,32 +83,46 @@ TRANSCRIPTION_MODELS = {
 
 # Summary Models Configuration
 SUMMARY_MODELS = {
-    "meta-llama/llama-3.2-3b-instruct:free": {
-        "name": "Llama 3.2 3B (Free)",
+    # Groq Models (Fast, Free, Reliable - RECOMMENDED)
+    "groq:llama-3.3-70b-versatile": {
+        "name": "Groq: Llama 3.3 70B (Free, Fast)",
         "max_tokens": 8192,
-        "description": "Free, reliable summarization (Recommended)"
+        "description": "FREE & FAST - Best choice for quick, reliable summaries (Recommended)"
     },
-    "google/gemini-2.0-flash-exp:free": {
-        "name": "Google Gemini 2.0 Flash (Free)",
-        "max_tokens": 16384,
-        "description": "Free, fast with large context (may be rate-limited)"
+    "groq:llama-3.1-70b-versatile": {
+        "name": "Groq: Llama 3.1 70B (Free)",
+        "max_tokens": 8192,
+        "description": "Free alternative with good quality"
     },
-    "nousresearch/hermes-3-llama-3.1-405b:free": {
+    "groq:mixtral-8x7b-32768": {
+        "name": "Groq: Mixtral 8x7B (Free)",
+        "max_tokens": 32768,
+        "description": "Free with very large context window"
+    },
+    # OpenRouter Free Models (Fallback)
+    "openrouter:nousresearch/hermes-3-llama-3.1-405b:free": {
         "name": "Hermes 3 Llama 405B (Free)",
         "max_tokens": 8192,
-        "description": "Free, very capable model with good detail"
+        "description": "Free OpenRouter model (may be rate-limited)"
     },
-    "microsoft/phi-3-mini-128k-instruct:free": {
+    "openrouter:microsoft/phi-3-mini-128k-instruct:free": {
         "name": "Microsoft Phi-3 Mini (Free)",
         "max_tokens": 8192,
         "description": "Free Microsoft model with large context"
     },
-    "meta-llama/llama-3.3-70b-instruct": {
+    # Legacy (for backward compatibility)
+    "meta-llama/llama-3.2-3b-instruct:free": {
+        "name": "Llama 3.2 3B (Free, Legacy)",
+        "max_tokens": 8192,
+        "description": "Older free model - use Groq models instead"
+    },
+    # Paid Options (Better Quality)
+    "openrouter:meta-llama/llama-3.3-70b-instruct": {
         "name": "Llama 3.3 70B (Paid)",
         "max_tokens": 16384,
-        "description": "Advanced, more reliable with comprehensive output (requires credits)"
+        "description": "Advanced with comprehensive output (requires credits)"
     },
-    "anthropic/claude-3.5-sonnet": {
+    "openrouter:anthropic/claude-3.5-sonnet": {
         "name": "Claude 3.5 Sonnet (Paid)",
         "max_tokens": 16384,
         "description": "Best quality with most detailed output (requires credits)"
