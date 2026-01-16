@@ -390,6 +390,17 @@ Lecture Transcript:
 Please create {num_questions} practice questions with detailed answer guides:"""
         
         try:
+            # Use Groq API for exam questions (faster and more reliable)
+            if not self.groq_api_key:
+                logger.warning("Groq API key not found, falling back to OpenRouter")
+                api_url = "https://openrouter.ai/api/v1/chat/completions"
+                api_key = self.api_key
+                model = "nousresearch/hermes-3-llama-3.1-405b:free"
+            else:
+                api_url = "https://api.groq.com/openai/v1/chat/completions"
+                api_key = self.groq_api_key
+                model = "llama-3.3-70b-versatile"
+            
             # Retry logic for rate limits
             max_retries = 3
             retry_delay = 5
@@ -397,18 +408,18 @@ Please create {num_questions} practice questions with detailed answer guides:"""
             for attempt in range(max_retries):
                 try:
                     response = requests.post(
-                        url="https://openrouter.ai/api/v1/chat/completions",
+                        url=api_url,
                         headers={
-                            "Authorization": f"Bearer {self.api_key}",
+                            "Authorization": f"Bearer {api_key}",
                             "Content-Type": "application/json",
                         },
                         json={
-                            "model": "meta-llama/llama-3.2-3b-instruct:free",
+                            "model": model,
                             "messages": [{"role": "user", "content": prompt}],
                             "temperature": 0.7,
-                            "max_tokens": 4000
+                            "max_tokens": 8000
                         },
-                        timeout=90
+                        timeout=120
                     )
                     
                     if response.status_code == 429 and attempt < max_retries - 1:

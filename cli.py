@@ -10,7 +10,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config.config import NVIDIA_API_KEY, OPENROUTER_API_KEY, OUTPUTS_DIR
+from config.config import NVIDIA_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, OUTPUTS_DIR
 from src.transcription import TranscriptionEngine
 from src.summarization import SummaryGenerator
 from src.file_exporter import FileExporter
@@ -41,7 +41,7 @@ def process_single_file(
     try:
         # Initialize engines
         transcription_engine = TranscriptionEngine(NVIDIA_API_KEY)
-        summary_generator = SummaryGenerator(OPENROUTER_API_KEY)
+        summary_generator = SummaryGenerator(OPENROUTER_API_KEY, GROQ_API_KEY)
         
         # Step 1: Transcribe
         print("\n📝 Step 1/4: Transcribing audio...")

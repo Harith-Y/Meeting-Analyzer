@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config.config import (
     UI_SETTINGS, TRANSCRIPTION_MODELS, PROCESSING_SETTINGS,
-    NVIDIA_API_KEY, OPENROUTER_API_KEY
+    NVIDIA_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY
 )
 from src.transcription import TranscriptionEngine
 from src.summarization import SummaryGenerator
@@ -295,7 +295,7 @@ def process_lecture(
         status_text.text("🤖 Generating AI summary...")
         progress_bar.progress(60)
         
-        summary_generator = SummaryGenerator(OPENROUTER_API_KEY)
+        summary_generator = SummaryGenerator(OPENROUTER_API_KEY, GROQ_API_KEY)
         
         # Use clean_transcript (without speaker labels/timestamps) for AI processing
         text_for_ai = transcript_result.get('clean_transcript', transcript_result['formatted_transcript'])
