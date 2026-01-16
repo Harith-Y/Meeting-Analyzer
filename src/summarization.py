@@ -58,6 +58,16 @@ class SummaryGenerator:
             provider = 'groq'
             actual_model = model
         
+        # Check if requested provider has API key, otherwise switch
+        if provider == 'groq' and not self.groq_api_key:
+            logger.warning(f"Groq API key not found, switching to OpenRouter fallback")
+            provider = 'openrouter'
+            actual_model = 'nousresearch/hermes-3-llama-3.1-405b:free'
+        elif provider == 'openrouter' and not self.api_key:
+            logger.warning(f"OpenRouter API key not found, switching to Groq fallback")
+            provider = 'groq'
+            actual_model = 'llama-3.3-70b-versatile'
+        
         # Get prompt template
         prompt_template = self.prompts.get(summary_type, self.prompts["class_lecture"])
         
@@ -72,9 +82,9 @@ class SummaryGenerator:
             # Try primary provider first, then fallback
             providers_to_try = [provider]
             if provider == 'groq' and self.api_key:
-                providers_to_try.append('openrouter')  # Fallback to OpenRouter
+                providers_to_try.append('openrouter')  # Fallback to OpenRouter if Groq fails
             elif provider == 'openrouter' and self.groq_api_key:
-                providers_to_try.append('groq')  # Fallback to Groq
+                providers_to_try.append('groq')  # Fallback to Groq if OpenRouter fails
             
             last_error = None
             
