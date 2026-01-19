@@ -281,11 +281,43 @@ def process_lecture(
             speaker_labels=speaker_labels
         )
         
+        # Store audio duration for error handling (even if transcription fails)
+        audio_duration_minutes = 0
+        if transcript_result.get('audio_metadata'):
+            duration_seconds = transcript_result['audio_metadata'].get('duration_seconds', 0)
+            audio_duration_minutes = duration_seconds / 60
+        
         if not transcript_result['success']:
             st.error("❌ Transcription failed")
             error_msg = transcript_result.get('errors') or transcript_result.get('error', 'Unknown error')
             st.error(error_msg)
             logger.error(f"Transcription failed: {error_msg}")
+            
+            # Provide specific guidance for common errors
+            if 'RST_STREAM' in error_msg or 'error code 2' in error_msg:
+                st.warning("### 🔧 gRPC Streaming Error Detected")
+                st.info("""
+                This error typically occurs with large audio files. **Recommended solutions:**
+                
+                1. **Split your audio file** into smaller segments (30-45 minutes each):
+                   ```bash
+                   python split_audio.py your_file.m4a --chunk-minutes 35
+                   ```
+                
+                2. **Disable speaker diarization** if enabled (reduces processing load)
+                
+                3. **Try again** - The system will automatically retry with optimized settings
+                
+                4. **Check your internet connection** - Ensure stable connectivity for long uploads
+                """)
+                
+                # Calculate if file is very long
+                if audio_duration_minutes > 60:
+                    st.error(f"⚠️ Your audio file is **{audio_duration_minutes:.1f} minutes** long. "
+                            "Files over 60 minutes are prone to streaming errors. **Please split the file.**")
+                elif audio_duration_minutes > 0:
+                    st.warning(f"📊 Audio duration: {audio_duration_minutes:.1f} minutes")
+            
             return
         
         progress_bar.progress(50)

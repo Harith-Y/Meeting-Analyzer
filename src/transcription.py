@@ -163,8 +163,15 @@ class TranscriptionEngine:
         Returns:
             dict: Raw transcription results
         """
-        # Retry logic for network failures (especially with diarization)
-        max_retries = 2 if enable_diarization else 1
+        # Retry logic for network failures (especially with diarization and long files)
+        # Increase retries for very long files that are more prone to connection issues
+        if audio_duration_seconds > 3600:  # > 1 hour
+            max_retries = 3
+        elif enable_diarization:
+            max_retries = 2
+        else:
+            max_retries = 2  # Changed from 1 to 2 for better reliability
+        
         retry_delay = 5  # seconds
         
         for attempt in range(max_retries):
@@ -178,12 +185,25 @@ class TranscriptionEngine:
             except subprocess.CalledProcessError as e:
                 # Check for network-related errors that we can retry
                 error_text = str(e.stderr) if e.stderr else str(e)
+                
+                # gRPC RST_STREAM errors - often related to file size/chunk issues
+                is_rst_stream_error = 'RST_STREAM' in error_text or 'error code 2' in error_text
                 is_network_error = any(err in error_text.lower() for err in [
                     'connection', 'unavailable', 'aborted', 'reset', 'timeout', 'network'
                 ])
                 
-                if is_network_error and attempt < max_retries - 1:
-                    logger.warning(f"Network error detected on attempt {attempt + 1}, will retry: {error_text[:200]}")
+                if is_rst_stream_error:
+                    logger.error("gRPC RST_STREAM error detected. This typically means:")
+                    logger.error("1. Audio file may be too large for streaming API")
+                    logger.error("2. Try splitting the file into smaller segments")
+                    logger.error("3. Network connection may be unstable")
+                    
+                    # For long files with RST_STREAM, suggest splitting
+                    if audio_duration_seconds > 3600:  # > 1 hour
+                        logger.error(f"File duration ({audio_duration_seconds/60:.1f} min) is very long. Consider splitting into 30-45 minute segments.")
+                
+                if (is_network_error or is_rst_stream_error) and attempt < max_retries - 1:
+                    logger.warning(f"Network/streaming error detected on attempt {attempt + 1}, will retry: {error_text[:200]}")
                     continue
                 else:
                     # Not a network error or final attempt failed
@@ -226,6 +246,18 @@ class TranscriptionEngine:
             logger.info(f"Executing transcription command with {model_config['name']}")
             logger.info(f"Using client script: {client_script}")
             
+            # Calculate optimal chunk size based on audio duration
+            # For large files, use bigger chunks to reduce number of gRPC calls
+            # Default is 1600 frames, but for long files we need more
+            if audio_duration_seconds > 1800:  # > 30 minutes
+                chunk_size = 16000  # 10x larger chunks
+            elif audio_duration_seconds > 600:  # > 10 minutes
+                chunk_size = 8000   # 5x larger chunks
+            else:
+                chunk_size = 3200   # 2x default for all files
+            
+            logger.info(f"Using chunk size: {chunk_size} frames (audio duration: {audio_duration_seconds/60:.1f} min)")
+            
             # Build command arguments
             cmd_args = [
                 python_executable,
@@ -235,7 +267,8 @@ class TranscriptionEngine:
                 "--metadata", "function-id", model_config['function_id'],
                 "--metadata", "authorization", f"Bearer {self.api_key}",
                 "--language-code", model_config['language_code'],
-                "--input-file", audio_path
+                "--input-file", audio_path,
+                "--file-streaming-chunk", str(chunk_size)
             ]
             
             # Add diarization flags if enabled

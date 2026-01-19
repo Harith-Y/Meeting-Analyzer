@@ -1,6 +1,11 @@
 """
 Split large audio files into smaller chunks for processing
-This helps with files that exceed the gRPC message size limit (67MB)
+This helps with files that exceed the gRPC streaming limits or encounter RST_STREAM errors.
+
+For files over 60 minutes, splitting into 30-45 minute segments is recommended to avoid:
+- gRPC RST_STREAM errors (error code 2)
+- Connection timeouts
+- Memory issues with diarization
 """
 import argparse
 import sys
