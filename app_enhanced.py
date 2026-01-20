@@ -43,6 +43,12 @@ if 'audio_filename' not in st.session_state:
     st.session_state.audio_filename = None
 if 'export_formats' not in st.session_state:
     st.session_state.export_formats = ['Markdown']
+if 'key_points_result' not in st.session_state:
+    st.session_state.key_points_result = None
+if 'exam_questions_result' not in st.session_state:
+    st.session_state.exam_questions_result = None
+if 'meeting_minutes_result' not in st.session_state:
+    st.session_state.meeting_minutes_result = None
 
 
 def main():
@@ -150,6 +156,11 @@ def main():
         
         include_key_points = st.checkbox("Extract Key Points", value=True)
         include_exam_questions = st.checkbox("Generate Exam Questions", value=True)
+        include_meeting_minutes = st.checkbox(
+            "Generate Minutes of Meeting (MoM)",
+            value=False,
+            help="Comprehensive meeting minutes capturing all details, decisions, and action items (recommended for meetings)"
+        )
         
         # Export options
         st.subheader("Export Options")
@@ -220,6 +231,7 @@ def main():
                 summary_type,
                 include_key_points,
                 include_exam_questions,
+                include_meeting_minutes,
                 auto_export,
                 export_formats,
                 enable_diarization,
@@ -234,7 +246,8 @@ def main():
             st.session_state.transcript_result,
             st.session_state.summary_result,
             include_key_points,
-            include_exam_questions
+            include_exam_questions,
+            include_meeting_minutes
         )
 
 
@@ -245,6 +258,7 @@ def process_lecture(
     summary_type: str,
     include_key_points: bool,
     include_exam_questions: bool,
+    include_meeting_minutes: bool,
     auto_export: bool,
     export_formats: list,
     enable_diarization: bool = False,
@@ -349,6 +363,7 @@ def process_lecture(
         # Step 3: Additional features
         key_points_result = None
         exam_questions_result = None
+        meeting_minutes_result = None
         
         if include_key_points:
             status_text.text("🔑 Extracting key points...")
@@ -369,6 +384,16 @@ def process_lecture(
             if not exam_questions_result.get('success', False):
                 st.warning(f"⚠️ Exam questions generation failed: {exam_questions_result.get('error', 'Unknown error')}")
                 logger.error(f"Exam questions generation failed: {exam_questions_result.get('error')}")
+            progress_bar.progress(85)
+        
+        if include_meeting_minutes:
+            status_text.text("📋 Generating comprehensive Minutes of Meeting...")
+            meeting_minutes_result = summary_generator.generate_meeting_minutes(
+                text_for_ai
+            )
+            if not meeting_minutes_result.get('success', False):
+                st.warning(f"⚠️ Meeting minutes generation failed: {meeting_minutes_result.get('error', 'Unknown error')}")
+                logger.error(f"Meeting minutes generation failed: {meeting_minutes_result.get('error')}")
             progress_bar.progress(90)
         
         # Step 4: Export if enabled
@@ -385,7 +410,8 @@ def process_lecture(
                 summary_result,
                 base_filename,
                 key_points_result=key_points_result,
-                exam_questions_result=exam_questions_result
+                exam_questions_result=exam_questions_result,
+                meeting_minutes_result=meeting_minutes_result
             )
             
             st.success(f"✅ Exported {len(exported_files)} files!")
@@ -399,6 +425,7 @@ def process_lecture(
         st.session_state.summary_result = summary_result
         st.session_state.key_points_result = key_points_result
         st.session_state.exam_questions_result = exam_questions_result
+        st.session_state.meeting_minutes_result = meeting_minutes_result
         st.session_state.processing_complete = True
         
         logger.info("Lecture processing completed successfully")
@@ -416,15 +443,21 @@ def display_results(
     transcript_result: dict,
     summary_result: dict,
     show_key_points: bool,
-    show_exam_questions: bool
+    show_exam_questions: bool,
+    show_meeting_minutes: bool = False
 ):
     """Display processing results"""
     
     st.divider()
     st.header("📊 Results")
     
-    # Tabs for different views
-    tabs = st.tabs(["📝 Transcript", "📚 Summary", "🔑 Key Points", "❓ Exam Questions", "📈 Metadata"])
+    # Tabs for different views - add MoM tab dynamically
+    tab_names = ["📝 Transcript", "📚 Summary", "🔑 Key Points", "❓ Exam Questions"]
+    if show_meeting_minutes:
+        tab_names.append("📋 Minutes of Meeting")
+    tab_names.append("📈 Metadata")
+    
+    tabs = st.tabs(tab_names)
     
     # Transcript tab
     with tabs[0]:
@@ -571,8 +604,47 @@ def display_results(
         else:
             st.info("No exam questions available")
     
-    # Metadata tab
-    with tabs[4]:
+    # Minutes of Meeting tab (conditional)
+    if show_meeting_minutes:
+        mom_tab_index = 4
+        with tabs[mom_tab_index]:
+            st.subheader("Minutes of Meeting (MoM)")
+            
+            if hasattr(st.session_state, 'meeting_minutes_result') and st.session_state.meeting_minutes_result:
+                meeting_minutes_result = st.session_state.meeting_minutes_result
+                if meeting_minutes_result.get('success'):
+                    # Get filename and format
+                    base_name = st.session_state.get('audio_filename', 'meeting_minutes')
+                    export_formats = st.session_state.get('export_formats', ['Markdown'])
+                    use_markdown = 'Markdown' in export_formats
+                    
+                    # Download button at top
+                    file_ext = 'md' if use_markdown else 'txt'
+                    mime_type = 'text/markdown' if use_markdown else 'text/plain'
+                    st.download_button(
+                        "⬇️ Download Minutes of Meeting",
+                        meeting_minutes_result.get('minutes', ''),
+                        file_name=f"{base_name}_MeetingMinutes.{file_ext}",
+                        mime=mime_type,
+                        use_container_width=True,
+                        type="primary"
+                    )
+                    
+                    st.divider()
+                    
+                    # Info box about MoM
+                    st.info("📋 **Comprehensive Meeting Minutes** - Includes all decisions, action items, discussions, and important details from the meeting.")
+                    
+                    st.divider()
+                    st.markdown(meeting_minutes_result.get('minutes', ''))
+                else:
+                    st.warning("Meeting minutes generation failed")
+            else:
+                st.info("No meeting minutes available")
+    
+    # Metadata tab (adjust index based on whether MoM is shown)
+    metadata_tab_index = 5 if show_meeting_minutes else 4
+    with tabs[metadata_tab_index]:
         st.subheader("Processing Metadata")
         
         if transcript_result:

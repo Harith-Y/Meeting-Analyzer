@@ -135,7 +135,8 @@ class FileExporter:
         summary_result: Dict[str, Any],
         base_filename: str,
         key_points_result: Optional[Dict[str, Any]] = None,
-        exam_questions_result: Optional[Dict[str, Any]] = None
+        exam_questions_result: Optional[Dict[str, Any]] = None,
+        meeting_minutes_result: Optional[Dict[str, Any]] = None
     ) -> Dict[str, str]:
         """
         Export complete transcription session (transcript + summary) in multiple formats.
@@ -146,6 +147,7 @@ class FileExporter:
             base_filename: Base filename for all exports
             key_points_result: Optional key points result dictionary
             exam_questions_result: Optional exam questions result dictionary
+            meeting_minutes_result: Optional meeting minutes result dictionary
         
         Returns:
             dict: Dictionary with paths to all exported files
@@ -214,6 +216,17 @@ class FileExporter:
 {exam_questions_result.get('questions', '')}
 """
             
+            # Add meeting minutes if available
+            if meeting_minutes_result and meeting_minutes_result.get('success'):
+                combined_md_content += f"""
+
+---
+
+## Minutes of Meeting
+
+{meeting_minutes_result.get('minutes', '')}
+"""
+            
             combined_md = self.export_to_markdown(
                 combined_md_content,
                 f"{base_filename}_complete",
@@ -253,6 +266,14 @@ class FileExporter:
                 complete_data['exam_questions'] = {
                     'text': exam_questions_result.get('questions', ''),
                     'questions': exam_questions_result.get('questions_list', [])
+                }
+            
+            # Add meeting minutes if available
+            if meeting_minutes_result and meeting_minutes_result.get('success'):
+                complete_data['meeting_minutes'] = {
+                    'text': meeting_minutes_result.get('minutes', ''),
+                    'timestamp': meeting_minutes_result.get('timestamp', ''),
+                    'model_used': meeting_minutes_result.get('model_used', '')
                 }
             
             json_file = self.export_to_json(complete_data, f"{base_filename}_data")

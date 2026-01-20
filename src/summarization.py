@@ -466,6 +466,100 @@ Please create {num_questions} practice questions with detailed answer guides:"""
             logger.error(error_msg, exc_info=True)
             return self._create_error_response(error_msg)
     
+    def generate_meeting_minutes(self, transcript: str) -> Dict[str, Any]:
+        """
+        Generate comprehensive Minutes of Meeting (MoM) from meeting transcript.
+        Designed to capture ALL important details, decisions, and action items without omission.
+        
+        Args:
+            transcript: The meeting transcript text
+        
+        Returns:
+            dict: Meeting minutes with complete details and metadata
+        """
+        logger.info("Generating comprehensive Minutes of Meeting...")
+        
+        # Use the meeting_minutes prompt template
+        prompt_template = self.prompts.get("meeting_minutes", self.prompts["class_lecture"])
+        prompt = prompt_template.format(transcript=transcript)
+        
+        try:
+            # Use Groq API for meeting minutes (faster and more reliable)
+            # Use the most capable model for comprehensive processing
+            if not self.groq_api_key:
+                logger.warning("Groq API key not found, falling back to OpenRouter")
+                api_url = "https://openrouter.ai/api/v1/chat/completions"
+                api_key = self.api_key
+                model = "nousresearch/hermes-3-llama-3.1-405b:free"
+            else:
+                api_url = "https://api.groq.com/openai/v1/chat/completions"
+                api_key = self.groq_api_key
+                model = "llama-3.3-70b-versatile"  # Most capable Groq model
+            
+            # Retry logic for rate limits
+            max_retries = 3
+            retry_delay = 5
+            
+            for attempt in range(max_retries):
+                try:
+                    response = requests.post(
+                        url=api_url,
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": model,
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": "You are an expert executive assistant specializing in creating comprehensive, detailed Minutes of Meeting. Your goal is to capture EVERY important detail without omission. Be thorough, precise, and exhaustive - meeting participants rely on complete accuracy."
+                                },
+                                {
+                                    "role": "user",
+                                    "content": prompt
+                                }
+                            ],
+                            "temperature": 0.3,  # Lower temperature for more factual, precise output
+                            "max_tokens": 8192   # Maximum tokens for comprehensive output
+                        },
+                        timeout=180  # Longer timeout for comprehensive processing
+                    )
+                    
+                    if response.status_code == 429 and attempt < max_retries - 1:
+                        logger.warning(f"Rate limited generating meeting minutes (attempt {attempt + 1}/{max_retries}), retrying...")
+                        import time
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                        continue
+                    
+                    if response.status_code == 200:
+                        minutes_text = response.json()["choices"][0]["message"]["content"]
+                        minutes_text = self._clean_summary(minutes_text)
+                        
+                        logger.info("Successfully generated comprehensive meeting minutes")
+                        return {
+                            'success': True,
+                            'minutes': minutes_text,
+                            'timestamp': datetime.now().isoformat(),
+                            'model_used': model
+                        }
+                    else:
+                        error_msg = f"API error {response.status_code}: {response.text}"
+                        logger.error(f"Meeting minutes generation failed: {error_msg}")
+                        return self._create_error_response(error_msg)
+                
+                except requests.Timeout:
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Timeout generating meeting minutes (attempt {attempt + 1}/{max_retries}), retrying...")
+                        continue
+                    raise
+        
+        except Exception as e:
+            error_msg = f"Error generating meeting minutes: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return self._create_error_response(error_msg)
+    
     def _clean_summary(self, text: str) -> str:
         """
         Clean up summary text by removing artifacts.

@@ -311,7 +311,105 @@ Transcript:
 
 ---
 
-Create notes that are so detailed a student who missed the lecture could learn everything from them. Be thorough, clear, and preserve all important information."""
+Create notes that are so detailed a student who missed the lecture could learn everything from them. Be thorough, clear, and preserve all important information.""",
+    
+    "meeting_minutes": """You are an expert executive assistant specializing in creating comprehensive Minutes of Meeting (MoM). Your goal is to capture EVERY important detail, decision, discussion point, and action item from the meeting without missing anything.
+
+IMPORTANT: Meetings are typically concise and every point matters. Unlike lectures, you must capture ALL content - no summarization, no omissions. Be exhaustive and thorough.
+
+Analyze this meeting transcript and provide comprehensive Minutes of Meeting with the following sections:
+
+## MEETING INFORMATION
+- Meeting title/purpose (if mentioned)
+- Date and time
+- Duration
+- Participants (if identifiable)
+- Meeting type (status update, planning, review, decision-making, etc.)
+
+## EXECUTIVE SUMMARY
+- Brief overview of meeting purpose (2-3 sentences)
+- Key outcomes and decisions summary
+- Critical action items at a glance
+
+## AGENDA & TOPICS DISCUSSED
+For EACH topic discussed (in chronological order):
+- Topic name and context
+- Full details of what was discussed
+- All viewpoints and opinions expressed
+- Questions raised and answers provided
+- Concerns or issues mentioned
+- Any data, figures, or examples referenced
+
+## KEY DECISIONS MADE
+For EACH decision:
+- What was decided
+- Who made or proposed the decision
+- Rationale and reasoning behind the decision
+- Context and background
+- Any dissenting opinions or alternatives considered
+- Implementation timeline (if mentioned)
+
+## ACTION ITEMS & NEXT STEPS
+For EACH action item:
+- Specific task or action to be taken
+- Person/team responsible (if mentioned)
+- Deadline or timeframe (if specified)
+- Priority level (if indicated)
+- Dependencies or prerequisites
+- Expected outcome or deliverable
+
+## DISCUSSIONS & DELIBERATIONS
+- All significant points discussed
+- Different perspectives and opinions shared
+- Debates or disagreements (with full context)
+- Consensus reached or pending decisions
+- Open questions or unresolved issues
+
+## IMPORTANT INFORMATION & DETAILS
+- All facts, figures, metrics, or data points mentioned
+- Dates, deadlines, and timelines discussed
+- Resources, budgets, or constraints mentioned
+- References to documents, projects, or external items
+- Any commitments or promises made
+
+## RISKS, CONCERNS & BLOCKERS
+- Potential risks or challenges identified
+- Concerns raised by participants
+- Blockers or obstacles discussed
+- Mitigation strategies proposed
+- Contingency plans mentioned
+
+## FOLLOW-UP ITEMS
+- Items requiring further discussion
+- Information to be gathered before next meeting
+- Pending approvals or decisions
+- Topics to be revisited
+- Scheduled follow-up meetings or check-ins
+
+## ANNOUNCEMENTS & UPDATES
+- Any announcements made during the meeting
+- Status updates on ongoing projects or initiatives
+- Changes to processes or procedures
+- Important communications or information shared
+
+## ADDITIONAL NOTES
+- Any other relevant information discussed
+- Side conversations or tangential points
+- Reference materials or documents mentioned
+- Links to related meetings or topics
+
+## SUMMARY OF COMMITMENTS
+- Complete list of all commitments made
+- Who committed to what
+- Expected delivery dates
+- Dependencies between commitments
+
+Transcript:
+{transcript}
+
+---
+
+Provide EXTREMELY COMPREHENSIVE and DETAILED Minutes of Meeting. Capture EVERY detail, discussion point, decision, and action item. Nothing should be omitted - meeting participants rely on these minutes for complete accuracy. Be thorough, precise, and preserve all context. Organize information clearly but include EVERYTHING discussed."""
 }
 
 # Export Settings
