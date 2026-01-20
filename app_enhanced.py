@@ -59,6 +59,8 @@ def main():
     st.markdown("""
     Transform your class recordings into comprehensive study materials for exam preparation.
     Upload your lecture audio, get accurate transcripts, and generate AI-powered summaries.
+    
+    💡 **Tip:** For best results, keep recordings under 45 minutes. For longer files, use `split_audio.py` to divide them into segments.
     """)
     
     # Sidebar configuration
@@ -195,10 +197,14 @@ def main():
         file_size_mb = audio_file.size / (1024 * 1024)
         file_ext = audio_file.name.split('.')[-1].lower()
         
+        # Estimate duration (rough approximation: 1 MB ≈ 1 minute for typical audio)
+        estimated_duration_minutes = file_size_mb  # Rough estimate
+        
         st.info(f"""
         **📄 File:** {audio_file.name}  
         **💾 Size:** {file_size_mb:.2f} MB  
-        **🎵 Format:** .{file_ext}
+        **🎵 Format:** .{file_ext}  
+        **⏱️ Estimated Duration:** ~{estimated_duration_minutes:.0f} minutes
         """)
         
         if file_ext != 'wav':
@@ -208,6 +214,23 @@ def main():
         if file_size_mb > PROCESSING_SETTINGS['max_file_size_mb']:
             st.error(f"⚠️ File size exceeds {PROCESSING_SETTINGS['max_file_size_mb']} MB limit")
             return
+        
+        # Warn about large files that may cause streaming errors
+        if file_size_mb > 50:  # Files > 50MB (roughly 45+ minutes) are at risk
+            st.warning("⚠️ **Large File Detected**")
+            st.markdown(f"""
+            Your file is **{file_size_mb:.1f} MB** (~{estimated_duration_minutes:.0f} min estimated).
+            
+            **To avoid gRPC streaming errors:**
+            - ✅ **Disable speaker diarization** (recommended for files > 45 min)
+            - ✅ Consider splitting file into smaller chunks if > 60 minutes
+            - ✅ Ensure stable internet connection during processing
+            
+            Files over 45 minutes may encounter "RST_STREAM" errors during streaming.
+            """)
+        elif file_size_mb > 35:  # 30-45 minute range
+            st.info(f"📊 Medium-sized file detected ({file_size_mb:.1f} MB). "
+                   "Consider disabling speaker diarization if you encounter any errors.")
     
     st.divider()
     
@@ -309,28 +332,70 @@ def process_lecture(
             
             # Provide specific guidance for common errors
             if 'RST_STREAM' in error_msg or 'error code 2' in error_msg:
-                st.warning("### 🔧 gRPC Streaming Error Detected")
-                st.info("""
-                This error typically occurs with large audio files. **Recommended solutions:**
-                
-                1. **Split your audio file** into smaller segments (30-45 minutes each):
-                   ```bash
-                   python split_audio.py your_file.m4a --chunk-minutes 35
-                   ```
-                
-                2. **Disable speaker diarization** if enabled (reduces processing load)
-                
-                3. **Try again** - The system will automatically retry with optimized settings
-                
-                4. **Check your internet connection** - Ensure stable connectivity for long uploads
-                """)
+                st.error("### 🔧 gRPC Streaming Error Detected")
                 
                 # Calculate if file is very long
                 if audio_duration_minutes > 60:
-                    st.error(f"⚠️ Your audio file is **{audio_duration_minutes:.1f} minutes** long. "
-                            "Files over 60 minutes are prone to streaming errors. **Please split the file.**")
+                    st.warning(f"⚠️ Your audio file is **{audio_duration_minutes:.1f} minutes** long. "
+                              "Files over 60 minutes frequently encounter streaming errors.")
+                elif audio_duration_minutes > 45:
+                    st.warning(f"📊 Audio duration: **{audio_duration_minutes:.1f} minutes** - "
+                              "This is at the upper limit for reliable streaming.")
                 elif audio_duration_minutes > 0:
-                    st.warning(f"📊 Audio duration: {audio_duration_minutes:.1f} minutes")
+                    st.info(f"📊 Audio duration: {audio_duration_minutes:.1f} minutes")
+                
+                st.markdown("""
+                ### 💡 Solutions to Fix This Error:
+                
+                **Option 1: Split Your Audio File (Recommended for large files)**
+                - For files over 45 minutes, splitting is highly recommended
+                - Split into 30-35 minute segments for optimal processing
+                - Use the command:
+                  ```bash
+                  python split_audio.py your_file.m4a --chunk-minutes 35
+                  ```
+                - Then process each chunk separately
+                
+                **Option 2: Disable Speaker Diarization**
+                - If you have "Enable Speaker Separation" checked, uncheck it
+                - This significantly reduces processing requirements
+                - You can still get accurate transcripts without speaker labels
+                
+                **Option 3: Try a Different Model**
+                - Switch to "OpenAI Whisper Large V3" (slower but more stable for large files)
+                - This model handles longer files better
+                
+                **Option 4: Check Your Setup**
+                - Ensure stable internet connection (required for streaming)
+                - Verify API key is valid and has remaining credits
+                - Try again in a few minutes (temporary API issues)
+                
+                ### 📝 For Meeting Processing:
+                Since you're using this for meetings (~30 min), this error suggests:
+                - Your internet connection may have interrupted
+                - Try uploading again with a stable connection
+                - Consider disabling speaker diarization if enabled
+                """)
+                
+                # Add helpful buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("📖 Read Full Troubleshooting Guide", use_container_width=True):
+                        st.info("""
+                        **Full Troubleshooting Steps:**
+                        
+                        1. Check file duration - split if > 45 minutes
+                        2. Disable diarization to reduce load
+                        3. Ensure stable internet connection
+                        4. Try different transcription model
+                        5. Check NVIDIA API status
+                        6. Verify API key has credits
+                        7. Try during off-peak hours
+                        """)
+                with col2:
+                    st.link_button("🔗 View FFMPEG Guide", 
+                                  "https://github.com/yourusername/meeting-analyzer/blob/main/FFMPEG_TROUBLESHOOTING.md",
+                                  use_container_width=True)
             
             return
         
