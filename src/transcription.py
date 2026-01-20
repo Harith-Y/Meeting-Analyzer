@@ -267,9 +267,12 @@ class TranscriptionEngine:
                 "--metadata", "function-id", model_config['function_id'],
                 "--metadata", "authorization", f"Bearer {self.api_key}",
                 "--language-code", model_config['language_code'],
-                "--input-file", audio_path,
-                "--file-streaming-chunk", str(chunk_size)
+                "--input-file", audio_path
             ]
+            
+            # Only add file-streaming-chunk for streaming clients (not offline)
+            if model_config['client_file'] != "transcribe_file_offline.py":
+                cmd_args.extend(["--file-streaming-chunk", str(chunk_size)])
             
             # Add diarization flags if enabled
             if enable_diarization:
