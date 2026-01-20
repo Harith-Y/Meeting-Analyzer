@@ -93,7 +93,7 @@ class TranscriptionEngine:
                 wav_audio_path = temp_audio_path
             
             # Check if we need to split audio (only for Whisper with long files)
-            chunk_threshold_minutes = 15  # Split files longer than this
+            chunk_threshold_minutes = 3  # Split files longer than this
             use_chunking = (model == "openai/whisper-large-v3" and 
                           audio_duration_minutes > chunk_threshold_minutes)
             
@@ -102,7 +102,7 @@ class TranscriptionEngine:
                 if progress_callback:
                     progress_callback(f"Splitting {audio_duration_minutes:.0f}-minute audio into chunks...")
                 
-                chunk_files = self.audio_processor.split_audio_into_chunks(wav_audio_path, chunk_duration_minutes=15)
+                chunk_files = self.audio_processor.split_audio_into_chunks(wav_audio_path, chunk_duration_minutes=5)
                 logger.info(f"Split audio into {len(chunk_files)} chunks")
                 
                 # Transcribe each chunk
@@ -367,20 +367,65 @@ class TranscriptionEngine:
                 timeout=timeout_seconds
             )
             
-            # Check if output contains speaker labels
+            # Parse output - the script outputs JSON first, then "Final transcript:" line
             raw_output = result.stdout.strip()
-            # Riva diarization output contains "Transcript N:" and "Speaker." in metadata
+            
+            # Try to extract transcript from JSON first (more reliable for long transcripts)
+            transcript_text = None
+            try:
+                import json
+                # Find the JSON object in the output (it's on the first lines)
+                lines = raw_output.split('\n')
+                json_str = None
+                for i, line in enumerate(lines):
+                    if line.strip().startswith('{'):
+                        # Find matching closing brace
+                        json_lines = []
+                        brace_count = 0
+                        for j in range(i, len(lines)):
+                            json_lines.append(lines[j])
+                            brace_count += lines[j].count('{') - lines[j].count('}')
+                            if brace_count == 0:
+                                json_str = '\n'.join(json_lines)
+                                break
+                        break
+                
+                if json_str:
+                    response_data = json.loads(json_str)
+                    # Extract transcript from all results
+                    if 'results' in response_data and len(response_data['results']) > 0:
+                        transcript_parts = []
+                        for result_item in response_data['results']:
+                            if 'alternatives' in result_item and len(result_item['alternatives']) > 0:
+                                transcript_parts.append(result_item['alternatives'][0].get('transcript', ''))
+                        transcript_text = ''.join(transcript_parts)
+                        logger.info(f"Extracted transcript from JSON: {len(transcript_text)} characters")
+            except Exception as e:
+                logger.warning(f"Could not parse JSON response: {str(e)}")
+            
+            # Fallback to "Final transcript:" line if JSON parsing failed
+            if not transcript_text:
+                for line in raw_output.split('\n'):
+                    if line.startswith('Final transcript:'):
+                        transcript_text = line.replace('Final transcript:', '').strip()
+                        logger.info(f"Extracted transcript from 'Final transcript:' line: {len(transcript_text)} characters")
+                        break
+            
+            # If still no transcript, use the whole output (last resort)
+            if not transcript_text:
+                transcript_text = raw_output
+                logger.warning("Could not extract transcript from structured format, using raw output")
+            
+            # Check if output contains speaker labels
             has_speakers = enable_diarization and ('Transcript' in raw_output and 'Speaker' in raw_output)
             
             if enable_diarization:
                 logger.info(f"Diarization output detection: has_speakers={has_speakers}")
                 logger.debug(f"Output preview (first 500 chars): {raw_output[:500]}...")
-                logger.debug(f"Output contains 'Transcript': {'Transcript' in raw_output}")
-                logger.debug(f"Output contains 'Speaker': {'Speaker' in raw_output}")
             
             return {
                 'success': True,
-                'raw_transcript': raw_output,
+                'raw_transcript': transcript_text,
                 'has_speakers': has_speakers,
                 'warnings': result.stderr if result.stderr else None
             }
