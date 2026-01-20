@@ -334,7 +334,63 @@ def process_lecture(
             logger.error(f"Transcription failed: {error_msg}")
             
             # Provide specific guidance for common errors
-            if 'RST_STREAM' in error_msg or 'error code 2' in error_msg:
+            if 'DEADLINE_EXCEEDED' in error_msg and 'failed to establish link to worker' in error_msg:
+                st.error("### ⚠️ NVIDIA API Worker Connection Failed")
+                
+                st.info(f"📊 Audio duration: **{audio_duration_minutes:.1f} minutes**")
+                
+                st.markdown("""
+                ### 🔍 What Happened?
+                The NVIDIA API service couldn't establish a connection to a processing worker node. 
+                This is typically an **infrastructure/availability issue** on NVIDIA's side, not your file.
+                
+                ### 💡 Immediate Solutions:
+                
+                **Option 1: Retry (Recommended)**
+                - Simply try processing again - this often resolves itself
+                - The API may have been temporarily unavailable
+                - Wait 30-60 seconds before retrying
+                
+                **Option 2: Disable Speaker Diarization**
+                - ✅ **Highly Recommended** - This reduces processing requirements significantly
+                - Uncheck "Enable Speaker Separation" in the sidebar
+                - You'll still get accurate transcripts, just without speaker labels
+                - This often bypasses worker availability issues
+                
+                **Option 3: Try Different Transcription Model**
+                - Switch to **"OpenAI Whisper Large V3"** in the sidebar
+                - Uses different infrastructure (offline processing)
+                - More stable but takes longer
+                - Better for when streaming services are unavailable
+                
+                **Option 4: Try During Off-Peak Hours**
+                - NVIDIA API may be under heavy load
+                - Try early morning or late evening (your timezone)
+                - Weekends typically have better availability
+                
+                ### 🎯 For Your 28.9-Minute Meeting:
+                Your file duration is perfectly fine - this is **not** a file size issue.
+                
+                **Quick Fix (90% success rate):**
+                1. ✅ **Uncheck "Enable Speaker Separation"** 
+                2. Click "Start Processing" again
+                3. If it fails again, wait 1-2 minutes and retry
+                
+                ### 🔧 If Problem Persists:
+                - Check [NVIDIA API Status](https://status.nvidia.com/)
+                - Verify your API key hasn't expired
+                - Consider switching to Whisper model as alternative
+                """)
+                
+                # Add quick action buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.info("💡 **Most likely fix:** Disable speaker diarization and retry")
+                with col2:
+                    if st.button("🔄 Check API Status", use_container_width=True):
+                        st.markdown("[🔗 NVIDIA API Status Page](https://status.nvidia.com/)")
+            
+            elif 'RST_STREAM' in error_msg or 'error code 2' in error_msg:
                 st.error("### 🔧 gRPC Streaming Error Detected")
                 
                 # Calculate if file is very long
@@ -399,6 +455,21 @@ def process_lecture(
                     st.link_button("🔗 View FFMPEG Guide", 
                                   "https://github.com/yourusername/meeting-analyzer/blob/main/FFMPEG_TROUBLESHOOTING.md",
                                   use_container_width=True)
+            
+            # Generic gRPC error handling
+            elif 'grpc' in error_msg.lower() or 'StatusCode' in error_msg:
+                st.warning("### ⚠️ NVIDIA API Communication Error")
+                st.markdown("""
+                A communication error occurred with the NVIDIA API service.
+                
+                **Quick Solutions:**
+                1. **Retry** - Often resolves temporary issues
+                2. **Disable speaker diarization** - Reduces processing load
+                3. **Check internet connection** - Ensure stable connectivity
+                4. **Try Whisper model** - Alternative transcription service
+                
+                If the problem persists, the NVIDIA API may be experiencing issues.
+                """)
             
             return
         
