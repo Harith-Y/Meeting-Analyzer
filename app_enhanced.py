@@ -161,8 +161,11 @@ def main():
         include_meeting_minutes = st.checkbox(
             "Generate Minutes of Meeting (MoM)",
             value=False,
-            help="Comprehensive meeting minutes capturing all details, decisions, and action items (recommended for meetings)"
+            help="Comprehensive meeting minutes capturing all details, decisions, and action items. Note: When enabled, summary generation is skipped (MoM provides comprehensive coverage)"
         )
+        
+        if include_meeting_minutes:
+            st.caption("💡 Summary will be skipped when MoM is enabled - Minutes of Meeting provides complete coverage")
         
         # Export options
         st.subheader("Export Options")
@@ -402,26 +405,47 @@ def process_lecture(
         progress_bar.progress(50)
         st.success("✅ Transcription completed!")
         
-        # Step 2: Summary Generation
-        status_text.text("🤖 Generating AI summary...")
-        progress_bar.progress(60)
-        
-        summary_generator = SummaryGenerator(OPENROUTER_API_KEY, GROQ_API_KEY)
-        
-        # Use clean_transcript (without speaker labels/timestamps) for AI processing
-        text_for_ai = transcript_result.get('clean_transcript', transcript_result['formatted_transcript'])
-        
-        summary_result = summary_generator.generate_summary(
-            text_for_ai,
-            summary_type=summary_type,
-            model=summary_model
-        )
-        
-        if not summary_result['success']:
-            st.warning("⚠️ Summary generation failed, but transcript is available")
-            logger.warning(f"Summary failed: {summary_result.get('errors')}")
+        # Step 2: Summary Generation (skip if MoM is enabled, as it's redundant for meetings)
+        summary_result = None
+        if include_meeting_minutes:
+            # Skip summary generation for meetings - MoM provides comprehensive coverage
+            st.info("ℹ️ Skipping summary generation - Minutes of Meeting will provide comprehensive coverage")
+            progress_bar.progress(60)
+            # Create a placeholder summary result
+            summary_result = {
+                'success': True,
+                'summary': 'Summary skipped - Minutes of Meeting generated instead',
+                'summary_type': 'meeting_minutes',
+                'model_name': 'N/A',
+                'word_count': 0,
+                'timestamp': datetime.now().isoformat()
+            }
         else:
-            st.success("✅ Summary generated!")
+            # Generate summary for lectures
+            status_text.text("🤖 Generating AI summary...")
+            progress_bar.progress(60)
+            
+            summary_generator = SummaryGenerator(OPENROUTER_API_KEY, GROQ_API_KEY)
+            
+            # Use clean_transcript (without speaker labels/timestamps) for AI processing
+            text_for_ai = transcript_result.get('clean_transcript', transcript_result['formatted_transcript'])
+            
+            summary_result = summary_generator.generate_summary(
+                text_for_ai,
+                summary_type=summary_type,
+                model=summary_model
+            )
+            
+            if not summary_result['success']:
+                st.warning("⚠️ Summary generation failed, but transcript is available")
+                logger.warning(f"Summary failed: {summary_result.get('errors')}")
+            else:
+                st.success("✅ Summary generated!")
+        
+        # Initialize summary_generator if not already done (for features below)
+        if include_meeting_minutes:
+            summary_generator = SummaryGenerator(OPENROUTER_API_KEY, GROQ_API_KEY)
+            text_for_ai = transcript_result.get('clean_transcript', transcript_result['formatted_transcript'])
         
         progress_bar.progress(75)
         
@@ -462,7 +486,7 @@ def process_lecture(
             progress_bar.progress(90)
         
         # Step 4: Export if enabled
-        if auto_export and summary_result['success']:
+        if auto_export and (summary_result['success'] or meeting_minutes_result):
             status_text.text("💾 Exporting results...")
             
             exporter = FileExporter()
@@ -569,7 +593,18 @@ def display_results(
     with tabs[1]:
         st.subheader("AI-Generated Summary")
         
-        if summary_result and summary_result.get('summary'):
+        # Check if summary was skipped for MoM
+        if show_meeting_minutes and summary_result and summary_result.get('summary_type') == 'meeting_minutes':
+            st.info("ℹ️ **Summary generation was skipped for this meeting**")
+            st.markdown("""
+            Since you enabled **Minutes of Meeting (MoM)**, the summary was not generated separately.
+            
+            **Why?** Minutes of Meeting provides comprehensive coverage of all meeting content,
+            making a separate summary redundant for meetings.
+            
+            📋 **View the Minutes of Meeting tab** for the full detailed output.
+            """)
+        elif summary_result and summary_result.get('summary'):
             # Get filename and format
             base_name = st.session_state.get('audio_filename', 'summary')
             export_formats = st.session_state.get('export_formats', ['Markdown'])
