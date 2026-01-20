@@ -80,6 +80,7 @@ class TranscriptionEngine:
                 progress_callback("Validating audio file...")
             
             audio_metadata = self.audio_processor.validate_audio_file(temp_audio_path)
+            audio_duration_minutes = audio_metadata.get('duration_minutes', 0)
             
             # Convert to WAV if necessary
             if progress_callback:
@@ -91,16 +92,70 @@ class TranscriptionEngine:
             else:
                 wav_audio_path = temp_audio_path
             
-            # Transcribe audio
-            if progress_callback:
-                progress_callback(f"Transcribing audio using {model_config['name']}...")
+            # Check if we need to split audio (only for Whisper with long files)
+            chunk_threshold_minutes = 15  # Split files longer than this
+            use_chunking = (model == "openai/whisper-large-v3" and 
+                          audio_duration_minutes > chunk_threshold_minutes)
             
-            transcript_result = self._run_transcription(
-                wav_audio_path,
-                model_config,
-                enable_diarization=enable_diarization,
-                audio_duration_seconds=audio_metadata.get('duration_seconds', 0)
-            )
+            if use_chunking:
+                logger.info(f"Audio is {audio_duration_minutes:.1f} minutes, splitting into chunks for Whisper")
+                if progress_callback:
+                    progress_callback(f"Splitting {audio_duration_minutes:.0f}-minute audio into chunks...")
+                
+                chunk_files = self.audio_processor.split_audio_into_chunks(wav_audio_path, chunk_duration_minutes=15)
+                logger.info(f"Split audio into {len(chunk_files)} chunks")
+                
+                # Transcribe each chunk
+                all_transcripts = []
+                for i, chunk_file in enumerate(chunk_files, 1):
+                    if progress_callback:
+                        progress_callback(f"Transcribing chunk {i}/{len(chunk_files)} using {model_config['name']}...")
+                    
+                    logger.info(f"Transcribing chunk {i}/{len(chunk_files)}: {chunk_file}")
+                    
+                    # Get chunk duration for timeout calculation
+                    chunk_metadata = self.audio_processor.validate_audio_file(chunk_file)
+                    chunk_duration_seconds = chunk_metadata.get('duration_seconds', 0)
+                    
+                    transcript_result = self._run_transcription(
+                        chunk_file,
+                        model_config,
+                        enable_diarization=False,  # Diarization not supported across chunks
+                        audio_duration_seconds=chunk_duration_seconds
+                    )
+                    
+                    if not transcript_result['success']:
+                        # Clean up chunk files before returning error
+                        self._cleanup_files(chunk_files)
+                        return transcript_result
+                    
+                    all_transcripts.append(transcript_result['raw_transcript'])
+                    logger.info(f"Chunk {i}/{len(chunk_files)} transcribed successfully")
+                
+                # Combine all transcripts
+                combined_transcript = '\n\n'.join(all_transcripts)
+                transcript_result = {
+                    'success': True,
+                    'raw_transcript': combined_transcript,
+                    'has_speakers': False,
+                    'warnings': f"Audio was split into {len(chunk_files)} chunks for processing"
+                }
+                
+                # Clean up chunk files
+                self._cleanup_files(chunk_files)
+                logger.info("All chunks transcribed and combined successfully")
+            else:
+                # Normal single-file transcription
+                # Transcribe audio
+                if progress_callback:
+                    progress_callback(f"Transcribing audio using {model_config['name']}...")
+                
+                transcript_result = self._run_transcription(
+                    wav_audio_path,
+                    model_config,
+                    enable_diarization=enable_diarization,
+                    audio_duration_seconds=audio_metadata.get('duration_seconds', 0)
+                )
             
             if not transcript_result['success']:
                 return transcript_result
@@ -273,6 +328,12 @@ class TranscriptionEngine:
             # Only add file-streaming-chunk for streaming clients (not offline)
             if model_config['client_file'] != "transcribe_file_offline.py":
                 cmd_args.extend(["--file-streaming-chunk", str(chunk_size)])
+            else:
+                # For offline transcription (Whisper), increase message size limits
+                # to handle longer transcripts (default 64MB may truncate long files)
+                max_message_size = 256 * 1024 * 1024  # 256MB
+                cmd_args.extend(["--max-message-length", str(max_message_size)])
+                logger.info(f"Using max message length: {max_message_size / (1024*1024):.0f}MB for offline transcription")
             
             # Add diarization flags if enabled
             if enable_diarization:

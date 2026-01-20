@@ -185,6 +185,67 @@ class AudioProcessor:
         else:
             return f"{minutes:02d}:{secs:02d}"
     
+    def split_audio_into_chunks(self, input_file: str, chunk_duration_minutes: int = 15) -> list:
+        """
+        Split audio file into smaller chunks of specified duration.
+        Useful for processing long files with offline transcription APIs.
+        
+        Args:
+            input_file: Path to input audio file
+            chunk_duration_minutes: Duration of each chunk in minutes (default: 15)
+        
+        Returns:
+            list: List of paths to chunk files
+        """
+        try:
+            logger.info(f"Splitting audio file into {chunk_duration_minutes}-minute chunks: {input_file}")
+            
+            # Get audio duration
+            probe = ffmpeg.probe(input_file)
+            duration_seconds = float(probe['format']['duration'])
+            chunk_duration_seconds = chunk_duration_minutes * 60
+            
+            # Calculate number of chunks needed
+            num_chunks = int(duration_seconds / chunk_duration_seconds) + (1 if duration_seconds % chunk_duration_seconds > 0 else 0)
+            logger.info(f"Audio duration: {duration_seconds/60:.1f} minutes, splitting into {num_chunks} chunks")
+            
+            chunk_files = []
+            base_name = os.path.splitext(os.path.basename(input_file))[0]
+            
+            for i in range(num_chunks):
+                start_time = i * chunk_duration_seconds
+                chunk_file = str(TEMP_DIR / f"{base_name}_chunk{i+1}of{num_chunks}.wav")
+                
+                logger.info(f"Creating chunk {i+1}/{num_chunks}: starting at {start_time/60:.1f} minutes")
+                
+                # Extract chunk using FFmpeg
+                (
+                    ffmpeg
+                    .input(input_file, ss=start_time, t=chunk_duration_seconds)
+                    .output(
+                        chunk_file,
+                        acodec=self.codec,
+                        ac=self.channels,
+                        ar=self.sample_rate
+                    )
+                    .overwrite_output()
+                    .run(capture_stdout=True, capture_stderr=True, quiet=True)
+                )
+                
+                chunk_files.append(chunk_file)
+                logger.info(f"Created chunk {i+1}: {chunk_file}")
+            
+            logger.info(f"Successfully split audio into {len(chunk_files)} chunks")
+            return chunk_files
+            
+        except ffmpeg.Error as e:
+            error_message = e.stderr.decode() if e.stderr else str(e)
+            logger.error(f"FFmpeg error during audio splitting: {error_message}")
+            raise ValueError(f"Audio splitting failed: {error_message}")
+        except Exception as e:
+            logger.error(f"Error splitting audio: {str(e)}")
+            raise
+    
     def estimate_processing_time(self, duration_minutes: float, model: str = "nvidia/parakeet-ctc-1.1b-asr") -> str:
         """
         Estimate processing time based on audio duration.
