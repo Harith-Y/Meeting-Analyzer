@@ -261,10 +261,17 @@ def main():
     input_ready = audio_file if input_mode == "Audio Recording" else text_file
 
     if input_ready:
+        # Check if the current file has already been processed
+        is_processed = (
+            st.session_state.get('processing_complete', False) and 
+            st.session_state.get('audio_filename') == os.path.splitext(input_ready.name)[0]
+        )
+        
         process_button = st.button(
             "🚀 Start Processing",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            disabled=is_processed
         )
         
         if process_button:
