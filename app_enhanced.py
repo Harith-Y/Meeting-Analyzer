@@ -180,23 +180,35 @@ def main():
     st.divider()
     
     # File upload section
-    st.header("📁 Upload Audio File")
+    st.header("📁 Upload File")
+    
+    input_mode = st.radio("Input Type", ["Audio Recording", "Text Transcript (.txt, .md)"], horizontal=True)
     
     col1, col2 = st.columns([2, 1])
     
+    audio_file = None
+    text_file = None
+    
     with col1:
-        audio_file = st.file_uploader(
-            "Select your class recording",
-            type=["mp3", "wav", "m4a", "flac", "ogg"],
-            help=f"Maximum file size: {PROCESSING_SETTINGS['max_file_size_mb']} MB"
-        )
+        if input_mode == "Audio Recording":
+            audio_file = st.file_uploader(
+                "Select your class recording",
+                type=["mp3", "wav", "m4a", "flac", "ogg"],
+                help=f"Maximum file size: {PROCESSING_SETTINGS['max_file_size_mb']} MB"
+            )
+        else:
+            text_file = st.file_uploader(
+                "Select your text transcript",
+                type=["txt", "md"],
+                help="Upload a raw text transcript to skip audio processing"
+            )
     
     with col2:
-        if audio_file:
+        if input_mode == "Audio Recording" and audio_file:
             st.audio(audio_file, format="audio/wav")
     
     # Display file info
-    if audio_file:
+    if input_mode == "Audio Recording" and audio_file:
         file_size_mb = audio_file.size / (1024 * 1024)
         file_ext = audio_file.name.split('.')[-1].lower()
         
@@ -234,11 +246,21 @@ def main():
         elif file_size_mb > 35:  # 30-45 minute range
             st.info(f"📊 Medium-sized file detected ({file_size_mb:.1f} MB). "
                    "Consider disabling speaker diarization if you encounter any errors.")
+    elif input_mode == "Text Transcript (.txt, .md)" and text_file:
+        file_size_kb = text_file.size / 1024
+        file_ext = text_file.name.split('.')[-1].lower()
+        st.info(f"""
+        **📄 File:** {text_file.name}  
+        **💾 Size:** {file_size_kb:.2f} KB  
+        **🎵 Format:** .{file_ext}  
+        """)
     
     st.divider()
     
     # Processing button
-    if audio_file:
+    input_ready = audio_file if input_mode == "Audio Recording" else text_file
+
+    if input_ready:
         process_button = st.button(
             "🚀 Start Processing",
             type="primary",
@@ -247,11 +269,11 @@ def main():
         
         if process_button:
             # Store settings in session state
-            st.session_state.audio_filename = os.path.splitext(audio_file.name)[0]
+            st.session_state.audio_filename = os.path.splitext(input_ready.name)[0]
             st.session_state.export_formats = export_formats
             
             process_lecture(
-                audio_file,
+                input_ready,
                 transcription_model,
                 summary_model,
                 summary_type,
@@ -261,10 +283,11 @@ def main():
                 auto_export,
                 export_formats,
                 enable_diarization,
-                {0: speaker_0_label, 1: speaker_1_label}
+                {0: speaker_0_label, 1: speaker_1_label},
+                input_mode
             )
     else:
-        st.info("👆 Please upload an audio file to begin")
+        st.info("👆 Please upload a file to begin")
     
     # Display results if available
     if st.session_state.processing_complete:
@@ -278,7 +301,7 @@ def main():
 
 
 def process_lecture(
-    audio_file,
+    input_file,
     transcription_model: str,
     summary_model: str,
     summary_type: str,
@@ -288,11 +311,12 @@ def process_lecture(
     auto_export: bool,
     export_formats: list,
     enable_diarization: bool = False,
-    speaker_labels: Optional[Dict[int, str]] = None
+    speaker_labels: Optional[Dict[int, str]] = None,
+    input_mode: str = "Audio Recording"
 ):
-    """Process the lecture recording"""
+    """Process the lecture recording or text transcript"""
     
-    logger.info(f"Starting lecture processing: {audio_file.name}")
+    logger.info(f"Starting lecture processing: {input_file.name}")
     
     # Reset session state
     st.session_state.processing_complete = False
@@ -304,22 +328,38 @@ def process_lecture(
     status_text = st.empty()
     
     try:
-        # Step 1: Transcription
-        status_text.text("🎤 Transcribing audio... This may take several minutes.")
-        progress_bar.progress(10)
-        
-        transcription_engine = TranscriptionEngine(NVIDIA_API_KEY)
-        
-        def update_progress(message):
-            status_text.text(f"🎤 {message}")
-        
-        transcript_result = transcription_engine.transcribe(
-            audio_file,
-            model=transcription_model,
-            progress_callback=update_progress,
-            enable_diarization=enable_diarization,
-            speaker_labels=speaker_labels
-        )
+        if input_mode == "Text Transcript (.txt, .md)":
+            status_text.text("📄 Reading uploaded transcript...")
+            progress_bar.progress(50)
+            
+            raw_text = input_file.getvalue().decode("utf-8")
+            
+            transcript_result = {
+                'success': True,
+                'formatted_transcript': raw_text,
+                'clean_transcript': raw_text,
+                'word_count': len(raw_text.split()),
+                'char_count': len(raw_text),
+                'audio_metadata': {'duration_formatted': 'N/A (Text Input)'},
+                'timestamp': datetime.now().isoformat()
+            }
+        else:
+            # Step 1: Transcription
+            status_text.text("🎤 Transcribing audio... This may take several minutes.")
+            progress_bar.progress(10)
+            
+            transcription_engine = TranscriptionEngine(NVIDIA_API_KEY)
+            
+            def update_progress(message):
+                status_text.text(f"🎤 {message}")
+            
+            transcript_result = transcription_engine.transcribe(
+                input_file,
+                model=transcription_model,
+                progress_callback=update_progress,
+                enable_diarization=enable_diarization,
+                speaker_labels=speaker_labels
+            )
         
         # Store audio duration for error handling (even if transcription fails)
         audio_duration_minutes = 0
