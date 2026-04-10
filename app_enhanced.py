@@ -609,7 +609,7 @@ def process_lecture(
             
             exporter = FileExporter()
             base_filename = exporter.generate_filename(
-                base_name=os.path.splitext(audio_file.name)[0]
+                base_name=os.path.splitext(input_file.name)[0]
             )
             
             exported_files = exporter.export_complete_session(
