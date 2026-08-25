@@ -130,17 +130,19 @@ def main():
         
         summary_model = st.selectbox(
             "Summary Model",
-            options=['groq:llama-3.3-70b-versatile',
-                     'groq:llama-3.1-70b-versatile',
-                     'groq:mixtral-8x7b-32768',
-                     'openrouter:nousresearch/hermes-3-llama-3.1-405b:free',
-                     'openrouter:microsoft/phi-3-mini-128k-instruct:free'],
+            options=['groq:openai/gpt-oss-120b',
+                     'groq:openai/gpt-oss-20b',
+                     'groq:groq/compound',
+                     'openrouter:nvidia/nemotron-3-super-120b-a12b:free',
+                     'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free',
+                     'openrouter:z-ai/glm-5.2:free'],
             format_func=lambda x: {
-                'groq:llama-3.3-70b-versatile': '⚡ Groq Llama 3.3 70B (FREE & FAST - Recommended)',
-                'groq:llama-3.1-70b-versatile': '⚡ Groq Llama 3.1 70B (FREE & FAST)',
-                'groq:mixtral-8x7b-32768': '⚡ Groq Mixtral 8x7B (FREE - Large Context)',
-                'openrouter:nousresearch/hermes-3-llama-3.1-405b:free': '🧠 Hermes 405B (Free, may be limited)',
-                'openrouter:microsoft/phi-3-mini-128k-instruct:free': '🔷 Phi-3 Mini (Free, may be limited)'
+                'groq:openai/gpt-oss-120b': '⚡ Groq GPT-OSS 120B (FREE & FAST - Recommended)',
+                'groq:openai/gpt-oss-20b': '⚡ Groq GPT-OSS 20B (FREE & FASTEST)',
+                'groq:groq/compound': '⚡ Groq Compound (FREE)',
+                'openrouter:nvidia/nemotron-3-super-120b-a12b:free': '🧠 Nemotron 3 Super 120B (Free, may be limited)',
+                'openrouter:nvidia/nemotron-3-ultra-550b-a55b:free': '🧠 Nemotron 3 Ultra 550B (Free, may be limited)',
+                'openrouter:z-ai/glm-5.2:free': '🔷 GLM 5.2 (Free, may be limited)'
             }[x],
             help="Groq models are FREE, FAST, and RELIABLE (no rate limits with your API key)"
         )

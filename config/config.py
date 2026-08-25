@@ -82,52 +82,54 @@ TRANSCRIPTION_MODELS = {
 }
 
 # Summary Models Configuration
+# NOTE: Provider catalogs change. Verify with:
+#   GET https://api.groq.com/openai/v1/models  and  GET https://openrouter.ai/api/v1/models
 SUMMARY_MODELS = {
     # Groq Models (Fast, Free, Reliable - RECOMMENDED)
-    "groq:llama-3.3-70b-versatile": {
-        "name": "Groq: Llama 3.3 70B (Free, Fast)",
+    "groq:openai/gpt-oss-120b": {
+        "name": "Groq: GPT-OSS 120B (Free, Fast)",
         "max_tokens": 8192,
-        "description": "FREE & FAST - Best choice for quick, reliable summaries (Recommended)"
+        "description": "FREE & FAST - Best choice for detailed, reliable summaries (Recommended)"
     },
-    "groq:llama-3.1-70b-versatile": {
-        "name": "Groq: Llama 3.1 70B (Free)",
+    "groq:openai/gpt-oss-20b": {
+        "name": "Groq: GPT-OSS 20B (Free, Fastest)",
         "max_tokens": 8192,
-        "description": "Free alternative with good quality"
+        "description": "Free and very fast - good for quick summaries"
     },
-    "groq:mixtral-8x7b-32768": {
-        "name": "Groq: Mixtral 8x7B (Free)",
-        "max_tokens": 32768,
-        "description": "Free with very large context window"
+    "groq:groq/compound": {
+        "name": "Groq: Compound (Free)",
+        "max_tokens": 8192,
+        "description": "Free agentic model with tool use built in"
     },
     # OpenRouter Free Models (Fallback)
-    "openrouter:nousresearch/hermes-3-llama-3.1-405b:free": {
-        "name": "Hermes 3 Llama 405B (Free)",
+    "openrouter:nvidia/nemotron-3-super-120b-a12b:free": {
+        "name": "Nemotron 3 Super 120B (Free)",
         "max_tokens": 8192,
         "description": "Free OpenRouter model (may be rate-limited)"
     },
-    "openrouter:microsoft/phi-3-mini-128k-instruct:free": {
-        "name": "Microsoft Phi-3 Mini (Free)",
+    "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free": {
+        "name": "Nemotron 3 Ultra 550B (Free)",
         "max_tokens": 8192,
-        "description": "Free Microsoft model with large context"
+        "description": "Largest free OpenRouter model (may be rate-limited)"
     },
-    # Legacy (for backward compatibility)
-    "meta-llama/llama-3.2-3b-instruct:free": {
-        "name": "Llama 3.2 3B (Free, Legacy)",
+    "openrouter:z-ai/glm-5.2:free": {
+        "name": "GLM 5.2 (Free)",
         "max_tokens": 8192,
-        "description": "Older free model - use Groq models instead"
+        "description": "Free OpenRouter model (may be rate-limited)"
     },
     # Paid Options (Better Quality)
-    "openrouter:meta-llama/llama-3.3-70b-instruct": {
-        "name": "Llama 3.3 70B (Paid)",
-        "max_tokens": 16384,
-        "description": "Advanced with comprehensive output (requires credits)"
-    },
-    "openrouter:anthropic/claude-3.5-sonnet": {
-        "name": "Claude 3.5 Sonnet (Paid)",
+    "openrouter:anthropic/claude-sonnet-4.5": {
+        "name": "Claude Sonnet 4.5 (Paid)",
         "max_tokens": 16384,
         "description": "Best quality with most detailed output (requires credits)"
     }
 }
+
+# Default model used when the caller does not pick one, plus the cross-provider
+# fallbacks tried when the primary provider fails.
+DEFAULT_SUMMARY_MODEL = "groq:openai/gpt-oss-120b"
+GROQ_FALLBACK_MODEL = "openai/gpt-oss-120b"
+OPENROUTER_FALLBACK_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
 
 # Speaker Diarization Settings
 DIARIZATION_SETTINGS = {

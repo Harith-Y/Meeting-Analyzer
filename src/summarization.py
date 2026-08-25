@@ -9,7 +9,15 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config.config import SUMMARY_MODELS, SUMMARY_PROMPTS, OPENROUTER_API_KEY, GROQ_API_KEY
+from config.config import (
+    SUMMARY_MODELS,
+    SUMMARY_PROMPTS,
+    OPENROUTER_API_KEY,
+    GROQ_API_KEY,
+    DEFAULT_SUMMARY_MODEL,
+    GROQ_FALLBACK_MODEL,
+    OPENROUTER_FALLBACK_MODEL,
+)
 from src.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -28,7 +36,7 @@ class SummaryGenerator:
         self,
         transcript: str,
         summary_type: str = "class_lecture",
-        model: str = "groq:llama-3.3-70b-versatile",
+        model: str = DEFAULT_SUMMARY_MODEL,
         custom_instructions: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -62,11 +70,11 @@ class SummaryGenerator:
         if provider == 'groq' and not self.groq_api_key:
             logger.warning(f"Groq API key not found, switching to OpenRouter fallback")
             provider = 'openrouter'
-            actual_model = 'nousresearch/hermes-3-llama-3.1-405b:free'
+            actual_model = OPENROUTER_FALLBACK_MODEL
         elif provider == 'openrouter' and not self.api_key:
             logger.warning(f"OpenRouter API key not found, switching to Groq fallback")
             provider = 'groq'
-            actual_model = 'llama-3.3-70b-versatile'
+            actual_model = GROQ_FALLBACK_MODEL
         
         # Get prompt template
         prompt_template = self.prompts.get(summary_type, self.prompts["class_lecture"])
@@ -92,7 +100,7 @@ class SummaryGenerator:
                 try:
                     result = self._call_api_provider(
                         current_provider,
-                        actual_model if current_provider == provider else ('llama-3.3-70b-versatile' if current_provider == 'groq' else 'nousresearch/hermes-3-llama-3.1-405b:free'),
+                        actual_model if current_provider == provider else (GROQ_FALLBACK_MODEL if current_provider == 'groq' else OPENROUTER_FALLBACK_MODEL),
                         prompt,
                         summary_type
                     )
@@ -184,7 +192,7 @@ class SummaryGenerator:
                                 }
                             ],
                             "temperature": 0.7,
-                            "max_tokens": 8192 if provider == 'groq' else self.models.get(model, {}).get('max_tokens', 4096)
+                            "max_tokens": 8192 if provider == 'groq' else self.models.get(f"openrouter:{model}", {}).get('max_tokens', 8192)
                         },
                         timeout=120
                     )
@@ -261,7 +269,6 @@ class SummaryGenerator:
         Args:
             transcript: The transcript text
             max_points: Maximum number of key points to extract
-        meta-llama/llama-3.1-8b-instruct
         Returns:
             dict: Key points and metadata
         """
@@ -281,11 +288,11 @@ Key Points:"""
                 logger.warning("Groq API key not found, falling back to OpenRouter")
                 api_url = "https://openrouter.ai/api/v1/chat/completions"
                 api_key = self.api_key
-                model = "meta-llama/llama-3.2-3b-instruct:free"
+                model = OPENROUTER_FALLBACK_MODEL
             else:
                 api_url = "https://api.groq.com/openai/v1/chat/completions"
                 api_key = self.groq_api_key
-                model = "llama-3.3-70b-versatile"
+                model = GROQ_FALLBACK_MODEL
             
             # Retry logic for rate limits
             max_retries = 3
@@ -405,11 +412,11 @@ Please create {num_questions} practice questions with detailed answer guides:"""
                 logger.warning("Groq API key not found, falling back to OpenRouter")
                 api_url = "https://openrouter.ai/api/v1/chat/completions"
                 api_key = self.api_key
-                model = "nousresearch/hermes-3-llama-3.1-405b:free"
+                model = OPENROUTER_FALLBACK_MODEL
             else:
                 api_url = "https://api.groq.com/openai/v1/chat/completions"
                 api_key = self.groq_api_key
-                model = "llama-3.3-70b-versatile"
+                model = GROQ_FALLBACK_MODEL
             
             # Retry logic for rate limits
             max_retries = 3
@@ -490,11 +497,11 @@ Please create {num_questions} practice questions with detailed answer guides:"""
                 logger.warning("Groq API key not found, falling back to OpenRouter")
                 api_url = "https://openrouter.ai/api/v1/chat/completions"
                 api_key = self.api_key
-                model = "nousresearch/hermes-3-llama-3.1-405b:free"
+                model = OPENROUTER_FALLBACK_MODEL
             else:
                 api_url = "https://api.groq.com/openai/v1/chat/completions"
                 api_key = self.groq_api_key
-                model = "llama-3.3-70b-versatile"  # Most capable Groq model
+                model = GROQ_FALLBACK_MODEL  # Most capable Groq model
             
             # Retry logic for rate limits
             max_retries = 3
